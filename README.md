@@ -20,7 +20,7 @@ Replace the placeholder paths below with the actual paths on your system before 
 ```bash
 export PYTHONPATH="/path/to/your/MalmoPlatform/Python_Examples:$PYTHONPATH"
 export MALMO_XSD_PATH="/path/to/your/MalmoPlatform/Schemas"
-cd /path/to/your/script/directory
+cd /path/to/Reinforcement-Learning-for-Crop-Management
 python your_script.py
 ```
 
@@ -29,7 +29,7 @@ python your_script.py
 ```cmd
 set PYTHONPATH=C:\path\to\your\MalmoPlatform\Python_Examples;%PYTHONPATH%
 set MALMO_XSD_PATH=C:\path\to\your\MalmoPlatform\Schemas
-cd C:\path\to\your\script\directory
+cd C:\path\to\Reinforcement-Learning-for-Crop-Management
 python your_script.py
 ```
 
@@ -38,7 +38,7 @@ python your_script.py
 ```powershell
 $env:PYTHONPATH = "C:\path\to\your\MalmoPlatform\Python_Examples;" + $env:PYTHONPATH
 $env:MALMO_XSD_PATH = "C:\path\to\your\MalmoPlatform\Schemas"
-cd C:\path\to\your\script\directory
+cd C:\path\to\Reinforcement-Learning-for-Crop-Management
 python your_script.py
 ```
 
