@@ -23,7 +23,68 @@ mission_xml = '''
         <ServerHandlers>
             <FlatWorldGenerator generatorString="3;7,225*minecraft:dirt,minecraft:farmland;1;" />
             <DrawingDecorator>
-                <DrawBlock x="0" y="227" z="0" type="wheat"/>
+                <!-- Draw wheats -->
+                <DrawBlock x="-1" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="-1" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="-1" y="227" z="-4" type="wheat"/>
+                <DrawBlock x="-1" y="227" z="-3" type="wheat"/>
+                <DrawBlock x="-1" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="-1" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="-1" y="227" z="0" type="wheat"/>
+
+                <DrawBlock x="-2" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="-2" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="-2" y="227" z="-4" type="wheat"/>
+                <DrawBlock x="-2" y="227" z="-3" type="wheat"/>
+                <DrawBlock x="-2" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="-2" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="-2" y="227" z="0" type="wheat"/>
+
+                <DrawBlock x="-3" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="-3" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="-3" y="227" z="-4" type="wheat"/>
+                <DrawBlock x="-3" y="227" z="-3" type="wheat"/>
+                <DrawBlock x="-3" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="-3" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="-3" y="227" z="0" type="wheat"/>
+
+                <DrawBlock x="0" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="0" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="0" y="227" z="-4" type="wheat"/>
+                <!--           skip 0,-3 for watr          -->
+                <DrawBlock x="0" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="0" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="0" y="227" z="-0" type="wheat"/>
+
+
+                <DrawBlock x="1" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="1" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="1" y="227" z="-4" type="wheat"/>
+                <DrawBlock x="1" y="227" z="-3" type="wheat"/>
+                <DrawBlock x="1" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="1" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="1" y="227" z="0" type="wheat"/>
+
+                <DrawBlock x="2" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="2" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="2" y="227" z="-4" type="wheat"/>
+                <DrawBlock x="2" y="227" z="-3" type="wheat"/>
+                <DrawBlock x="2" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="2" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="2" y="227" z="0" type="wheat"/>
+
+                <DrawBlock x="3" y="227" z="-6" type="wheat"/>
+                <DrawBlock x="3" y="227" z="-5" type="wheat"/>
+                <DrawBlock x="3" y="227" z="-4" type="wheat"/>
+                <DrawBlock x="3" y="227" z="-3" type="wheat"/>
+                <DrawBlock x="3" y="227" z="-2" type="wheat"/>
+                <DrawBlock x="3" y="227" z="-1" type="wheat"/>
+                <DrawBlock x="3" y="227" z="0" type="wheat"/>
+
+                
+
+                <!-- Draw water to keep wheat alive-->
+                <DrawBlock x="0" y="226" z="-3" type="water" />
             </DrawingDecorator>
             <ServerQuitWhenAnyAgentFinishes />
         </ServerHandlers>
