@@ -105,12 +105,14 @@ mission_xml = '''
                 <Item type="wheat" description="Success! Collected the wheat."/>
                 <!-- You can add more <Item /> tags here if you want to quit on collecting other items too -->
             </AgentQuitFromCollectingItem>
+            <AgentQuitFromTimeUp timeLimitMs="30000" description="Mission Ended (Time Up)."/>
             <ObservationFromGrid>
                 <Grid name="wheatField">
                     <min x="-3" y="225" z="-6"/>
                     <max x="3" y="229" z="0"/>
                 </Grid>
             </ObservationFromGrid>
+            <ObservationFromRay />
         </AgentHandlers>
     </AgentSection>
 </Mission>
@@ -222,38 +224,122 @@ time.sleep(3)                       # Hold the 'use' action for 3 seconds.
 agent_host.sendCommand("use 0")     # Stop 'use' action.
 time.sleep(1)                       # Pause after use action.
 
-# Action: Attack (e.g., Break Wheat)
-# 'attack 1' simulates a left-click action to break a block or attack an entity.
-# 'attack 0' stops the attack action. This quick sequence is for a single hit.
-print("AGENT ACTION: Attempting to attack/break block in front.")
-agent_host.sendCommand("attack 1")  # Start 'attack' action (left-click).
-time.sleep(0.1)                     # Hold attack briefly (enough for one hit on many blocks in creative).
-agent_host.sendCommand("attack 0")  # Stop 'attack' action.
-# Note: Breaking blocks, especially in survival, might require repeated attack commands or holding attack 1 for longer.
-
-# Action: Move Forward
-# 'move 1' starts moving the agent forward in its current facing direction.
-print("AGENT ACTION: Moving forward.")
-agent_host.sendCommand("move 1")    # Start moving forward.
-time.sleep(1)                       # Move forward for 0.5 seconds.
-agent_host.sendCommand("move 0")    # Stop moving forward.
-# Note: A longer pause might be needed here if the agent needs to reach a specific block.
-
-
-# Loop until mission ends:
-while world_state.is_mission_running:
-    if world_state.number_of_observations_since_last_state > 0:
-        msg = world_state.observations[-1].text
+world_state = agent_host.getWorldState()
+if world_state.number_of_observations_since_last_state > 0:
+    msg = world_state.observations[-1].text
+    try:
         observations = json.loads(msg)
-        if "wheatField" in observations:
-                wheat_field = observations["wheatField"]
-                print("Wheat Field Grid:", wheat_field)
-                print("Grid Size:", len(wheat_field))
-    print(".", end="")
-    time.sleep(0.1)
-    world_state = agent_host.getWorldState()
-    for error in world_state.errors:
-        print("Error:",error.text)
+
+        if "LineOfSight" in observations:
+            los = observations["LineOfSight"]
+            print("--- Line of Sight ---")
+            print(f"  Hit Type: {los.get('hitType')}")
+            print(f"  In Range: {los.get('inRange')}")
+            print(f"  Distance: {los.get('distance')}")
+            print(f"  Type: {los.get('type')}")
+            print(f"  Position: x={los.get('x')}, y={los.get('y')}, z={los.get('z')}")
+
+            # Check for "prop_" prefixed properties
+            block_properties = {}
+            for key, value in los.items():
+                if key.startswith("prop_"):
+                    block_properties[key] = value
+            
+            if block_properties:
+                print(f"  Block Properties: {block_properties}")
+                # Specifically check for age if looking at wheat
+                if los.get('type') == 'wheat' and 'prop_age' in block_properties:
+                    print(f"  WHEAT AGE (from Ray): {block_properties['prop_age']}")
+        
+            if "NBTTagCompound" in los: # If you used includeNBT="true"
+                print(f"  NBT Data: {los['NBTTagCompound']}")
+            print("--------------------")
+
+    except json.JSONDecodeError:
+        print("Error decoding JSON for Ray observation:", msg)
+    except Exception as e:
+        print(f"Error processing Ray observation: {e}")
+
+time.sleep(2) 
+
+# Action: Strafe (Sidestep) to the Right
+# 'strafe 1' starts moving the agent sideways to its right, without changing facing direction.
+print("AGENT ACTION: Strafing right.")
+agent_host.sendCommand("strafe 1")  # Start strafing right.
+time.sleep(0.5)                     # Strafe for 0.5 seconds.
+agent_host.sendCommand("strafe 0")  # Stop strafing.
+time.sleep(1)                       # Pause after movement.
+
+
+world_state = agent_host.getWorldState()
+# if world_state.number_of_observations_since_last_state > 0:
+msg = world_state.observations[-1].text
+try:
+    observations = json.loads(msg)
+
+    if "LineOfSight" in observations:
+        los = observations["LineOfSight"]
+        print("--- Line of Sight ---")
+        print(f"  Hit Type: {los.get('hitType')}")
+        print(f"  In Range: {los.get('inRange')}")
+        print(f"  Distance: {los.get('distance')}")
+        print(f"  Type: {los.get('type')}")
+        print(f"  Position: x={los.get('x')}, y={los.get('y')}, z={los.get('z')}")
+
+        # Check for "prop_" prefixed properties
+        block_properties = {}
+        for key, value in los.items():
+            if key.startswith("prop_"):
+                block_properties[key] = value
+        
+        if block_properties:
+            print(f"  Block Properties: {block_properties}")
+            # Specifically check for age if looking at wheat
+            if los.get('type') == 'wheat' and 'prop_age' in block_properties:
+                print(f"  WHEAT AGE (from Ray): {block_properties['prop_age']}")
+    
+        if "NBTTagCompound" in los: # If you used includeNBT="true"
+            print(f"  NBT Data: {los['NBTTagCompound']}")
+        print("--------------------")
+
+except json.JSONDecodeError:
+    print("Error decoding JSON for Ray observation:", msg)
+except Exception as e:
+    print(f"Error processing Ray observation: {e}")
+
+
+# # Action: Attack (e.g., Break Wheat)
+# # 'attack 1' simulates a left-click action to break a block or attack an entity.
+# # 'attack 0' stops the attack action. This quick sequence is for a single hit.
+# print("AGENT ACTION: Attempting to attack/break block in front.")
+# agent_host.sendCommand("attack 1")  # Start 'attack' action (left-click).
+# time.sleep(0.1)                     # Hold attack briefly (enough for one hit on many blocks in creative).
+# agent_host.sendCommand("attack 0")  # Stop 'attack' action.
+# # Note: Breaking blocks, especially in survival, might require repeated attack commands or holding attack 1 for longer.
+
+# # Action: Move Forward
+# # 'move 1' starts moving the agent forward in its current facing direction.
+# print("AGENT ACTION: Moving forward.")
+# agent_host.sendCommand("move 1")    # Start moving forward.
+# time.sleep(1)                       # Move forward for 0.5 seconds.
+# agent_host.sendCommand("move 0")    # Stop moving forward.
+# # Note: A longer pause might be needed here if the agent needs to reach a specific block.
+
+
+# # Loop until mission ends:
+# while world_state.is_mission_running:
+#     if world_state.number_of_observations_since_last_state > 0:
+#         msg = world_state.observations[-1].text
+#         observations = json.loads(msg)
+#         if "wheatField" in observations:
+#                 wheat_field = observations["wheatField"]
+#                 print("Wheat Field Grid:", wheat_field)
+#                 print("Grid Size:", len(wheat_field))
+#     print(".", end="")
+#     time.sleep(0.1)
+#     world_state = agent_host.getWorldState()
+#     for error in world_state.errors:
+#         print("Error:",error.text)
 
 print()
 print("Mission ended")
