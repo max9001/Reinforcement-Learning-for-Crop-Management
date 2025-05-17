@@ -96,7 +96,7 @@ mission_xml = '''
             <Inventory />
         </AgentStart>
         <AgentHandlers>
-            <AgentQuitFromTimeUp timeLimitMs="300000" description="Step 2 Test Ended."/>
+            <AgentQuitFromTimeUp timeLimitMs="5000" description="Step 2 Test Ended."/>
         </AgentHandlers>
     </AgentSection>
 </Mission>
@@ -137,7 +137,9 @@ for retry in range(max_retries):
     except RuntimeError as e:
         if retry == max_retries - 1:
             print("Error starting mission:", e)
-            print("Is the Minecraft client running and waiting for a mission?")
+            print("*********")
+            print("Most likely incorrect formatting in your XML section -Max")
+            print("*********")
             exit(1)
         else:
             print("Retry starting mission in 2 seconds...")
@@ -153,66 +155,3 @@ while not world_state.has_mission_begun:
         print("\nERROR during mission start:", error.text)
         # If there are errors here, it often means an XML issue or client connection problem
 print("\nMission started!")
-
-# --- Main Loop (Simplified for testing) ---
-commands_sent = 0
-target_commands = 4 # 3 moves + 1 attack command sequence
-
-while world_state.is_mission_running:
-    time.sleep(0.1) # Wait a bit between polling
-    world_state = agent_host.getWorldState()
-
-    if commands_sent == 0:
-        print("Sending: move 1 (forward)")
-        agent_host.sendCommand("move 1")
-        commands_sent += 1
-    elif commands_sent == 1:
-        print("Sending: move 1 (forward)")
-        agent_host.sendCommand("move 1")
-        commands_sent += 1
-    elif commands_sent == 2:
-        print("Sending: move 1 (forward)")
-        agent_host.sendCommand("move 1")
-        commands_sent += 1
-    elif commands_sent == 3: # After 3 moves, try attacking
-        print("Sending: attack 1")
-        agent_host.sendCommand("attack 1")
-        commands_sent += 1 # Increment to stop sending commands
-    # Stop sending commands after the sequence
-    # The agent will stop moving/attacking on its own after a short period for discrete commands
-    # or we could send "move 0" / "attack 0" explicitly after a delay.
-
-    if world_state.number_of_observations_since_last_state > 0:
-        msg = world_state.observations[-1].text
-        try:
-            observations = json.loads(msg)
-            # print("Observations:", observations)
-            if "inventory" in observations:
-                for item_slot in observations["inventory"]:
-                    if item_slot.get("type") == "minecraft:wheat" or item_slot.get("type") == "wheat": # check both
-                        print("\nFrank has wheat in inventory!")
-                        # Mission should quit automatically due to AgentQuitFromCollectingItem
-                        break
-        except json.JSONDecodeError:
-            print("\nError decoding JSON observations:", msg)
-
-
-    for reward in world_state.rewards:
-        print(f"\nReward received: {reward.getValue()}")
-
-    for error in world_state.errors: # Check for runtime errors
-        print("\nERROR during mission:", error.text)
-
-print("\nMission ended.")
-# Check remarks for success
-mission_successful = False
-for remark in world_state.mission_ended_remarks:
-    print(f"Mission End Remark: {remark}")
-    if "Success! Collected the wheat." in remark:
-        mission_successful = True
-        break
-
-if mission_successful:
-    print("Frank successfully collected the wheat!")
-else:
-    print("Frank did not collect the wheat or mission ended for other reasons.")
