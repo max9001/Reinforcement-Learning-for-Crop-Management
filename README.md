@@ -1,5 +1,7 @@
 # Reinforcement-Learning-for-Crop-Management
 
+https://microsoft.github.io/malmo/0.21.0/Schemas/MissionHandlers
+
 ## Running Malmo Python Scripts from Other Directories 
 
 Instructions for temporarily setting environment variables needed to run Malmo Python scripts from a location outside the default Malmo `Python_Examples` folder. These settings apply only to the current terminal/shell session.
