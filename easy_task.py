@@ -8,7 +8,7 @@ import os
 import sys # <<< IMPORTANT: Ensure this is imported
 import time
 import json
-from helper import get_wheat_age_in_los, teleport_agent, iterate_through_farm
+from helper import get_wheat_age_in_los, teleport_agent, iterate_through_farm, perform_random_teleport_step
 
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
@@ -190,11 +190,18 @@ print("\nMission started!")
 # --- Agent Action Sequence ---
 
 
+
+
 agent_host.sendCommand("setPitch 90")
-time.sleep(0.2)
+time.sleep(2)
+
+teleport_agent(agent_host, -3, 227, -3)
+current_x = -3
+current_z = -3
+
 
 while(1):
-    iterate_through_farm(agent_host)
+    current_x, current_z = perform_random_teleport_step(agent_host, current_x, current_z)
 
 print()
 print("Mission ended")

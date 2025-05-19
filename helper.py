@@ -1,5 +1,6 @@
 import json
 import time
+import random
 
 def get_wheat_age_in_los(agent_host_instance):
     """
@@ -139,6 +140,84 @@ def iterate_through_farm(agent_host):
     print("Farm iteration complete.")
 
 
+def perform_random_teleport_step(agent_host, current_x, current_z, agent_y=227.0):
+    """
+    Performs a single random walk step by teleporting the agent one unit
+    in a random cardinal direction (North, South, East, West) from its
+    current X, Z position. Avoids teleporting to the forbidden water block.
+
+    The agent is teleported to be centered on the new block (X_new + 0.5, Z_new + 0.5).
+
+    Args:
+        agent_host_instance: The MalmoPython.AgentHost object.
+        current_x (float): The agent's current logical X coordinate (e.g., -1.0, 0.0, 1.0).
+                           Assumed to be the center of a block if it ends in .0,
+                           or already adjusted if it ends in .5.
+                           The function will normalize this to the block's base X.
+        current_z (float): The agent's current logical Z coordinate.
+        agent_y (float, optional): The Y level at which the agent should be teleported.
+                                   Defaults to 227.0.
+
+    Returns:
+        tuple: (new_x_logical, new_z_logical) representing the new logical
+               block coordinates after the random step. If no valid move
+               is possible (e.g., surrounded by the forbidden block or edges
+               if you add boundary checks), it returns the original coordinates.
+    """
+    # Normalize current_x and current_z to be the base integer coordinates of the block
+    # This handles cases where current_x might be something like -0.5 (from previous centering)
+    base_current_x = int(round(current_x - 0.5)) if isinstance(current_x, float) and current_x % 1 != 0 else int(current_x)
+    base_current_z = int(round(current_z - 0.5)) if isinstance(current_z, float) and current_z % 1 != 0 else int(current_z)
+
+    possible_moves = [
+        (0, 1),   # Move South (positive Z)
+        (0, -1),  # Move North (negative Z)
+        (1, 0),   # Move East (positive X)
+        (-1, 0)   # Move West (negative X)
+    ]
+    random.shuffle(possible_moves)  # Shuffle to try directions in a random order
+
+    forbidden_x, forbidden_y, forbidden_z = 0, 227, -3 # The water block to avoid
+
+    for dx, dz in possible_moves:
+        next_logical_x = base_current_x + dx
+        next_logical_z = base_current_z + dz
+
+        # Check if the *target block coordinates* are the forbidden coordinates
+        # Note: The forbidden block is at y=226, but our agent moves at y=227.
+        # We are checking if the (X,Z) of the target block is (0, -3).
+        # The agent will be teleported *above* this spot.
+        if next_logical_x == forbidden_x and next_logical_z == forbidden_z:
+            # print(f"Random step to ({next_logical_x}, {next_logical_z}) is forbidden. Trying another direction.")
+            continue  # Skip this move, try the next random direction
+
+        # If you had farm boundaries, you would add checks here:
+        # farm_min_x, farm_max_x = -3, 3
+        # farm_min_z, farm_max_z = -6, 0
+        # if not (farm_min_x <= next_logical_x <= farm_max_x and \
+        #         farm_min_z <= next_logical_z <= farm_max_z):
+        #     # print(f"Random step to ({next_logical_x}, {next_logical_z}) is out of farm bounds. Trying another direction.")
+        #     continue
+
+        # Calculate agent's actual teleport target (centered on the new block)
+        agent_teleport_x = next_logical_x + 0.5
+        agent_teleport_z = next_logical_z + 0.5
+
+#         print(f"Random walk: Current logical ({base_current_x},{base_current_z}) -> New logical ({next_logical_x},{next_logical_z}). Teleporting agent to ({agent_teleport_x}, {agent_y}, {agent_teleport_z})")
+        teleport_agent(agent_host, agent_teleport_x, agent_y, agent_teleport_z)
+        
+        return next_logical_x, next_logical_z # Return the new logical block coordinates
+
+    # If all possible moves were forbidden or out of bounds
+#     print(f"Random walk: No valid move from ({base_current_x},{base_current_z}). Agent remains at current location.")
+    return base_current_x, base_current_z # Return original logical coords if no move was made  
+    
+    
+    
+    
+    
+    
+  
 
 def look_down_harvest_and_replant(agent_host):
     """
