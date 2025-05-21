@@ -10,6 +10,7 @@ import random
 import time
 import json
 from helper import *
+from q_agent import QLearningAgent
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
 
@@ -35,7 +36,6 @@ mission_xml = '''
         <ServerHandlers>
             <FlatWorldGenerator generatorString="3;7,225*minecraft:dirt,minecraft:farmland;1;" />
             <DrawingDecorator>
-
                 <!-- Draw wheats -->
                 <DrawBlock x="-1" y="227" z="-6" type="wheat"/>
                 <DrawBlock x="-1" y="227" z="-5" type="wheat"/>
@@ -94,6 +94,8 @@ mission_xml = '''
                 <DrawBlock x="3" y="227" z="-1" type="wheat"/>
                 <DrawBlock x="3" y="227" z="0" type="wheat"/>
 
+
+
                 <!-- Draw water to keep wheat alive-->
                 <DrawBlock x="0" y="226" z="-3" type="water" />
             </DrawingDecorator>
@@ -105,16 +107,18 @@ mission_xml = '''
         <AgentStart>
             <Placement x="0.5" y="227.0" z="3.5" yaw="180" />
             <Inventory>
-                
+
                 <InventoryItem slot="0" type="wheat_seeds" quantity="64"/> 
-                
+
             </Inventory>
         </AgentStart>
         <AgentHandlers>
+            <ContinuousMovementCommands turnSpeedDegs="180"/> 
+            <DiscreteMovementCommands />
             <InventoryCommands />
             <AbsoluteMovementCommands/>
-            <ContinuousMovementCommands turnSpeedDegs="180"/>
-            <AgentQuitFromTimeUp timeLimitMs="10000000" description="Mission Ended (Time Up)."/>
+
+            <AgentQuitFromTimeUp timeLimitMs="100000000" description="Mission Ended (Time Up)."/>
             <ObservationFromGrid>
                 <Grid name="wheatField">
                     <min x="-3" y="225" z="-6"/>
@@ -122,6 +126,7 @@ mission_xml = '''
                 </Grid>
             </ObservationFromGrid>
             <ObservationFromRay />
+            <ObservationFromFullInventory/>
         </AgentHandlers>
     </AgentSection>
 </Mission>
@@ -177,34 +182,61 @@ while not world_state.has_mission_begun:
         # If there are errors here, it often means an XML issue or client connection problem
 print("\nMission started!")
 
-# Mission setup - try stuff below here:
-
 # --- Agent Action Sequence ---
+# while agent_host.getWorldState().is_mission_running:
+#random_method(agent_host)       
 
-agent_host.sendCommand("setPitch 90")
-time.sleep(0.01)
+    # iteration_method(agent_host)
 
-teleport_agent(agent_host, 0.5, 227, -2.5)
-current_x = 0
-current_z = -3
+#wait_10mins_method(agent_host)
 
-while(1):
-    time.sleep(0.5)
-    
-    choice = random.randint(1, 3)
-
-    if choice == 1:
-        attack(agent_host)
-
-    elif choice == 2:
-        plant_seed(agent_host)
-    elif choice == 3:
-        current_x, current_z = perform_random_teleport_step(agent_host, current_x, current_z)
-        
-
-    # iterate_through_farm(agent_host)
+# --- RL Setup ---
+# Define your action space (index to method)
+methods = [wait_10mins_method, iteration_method, random_method]
+method_names = ["wait_10mins", "iteration", "random"]
 
 
+
+# --- RL Training Loop ---
+
+num_episodes = 10  # Increase for real training
+max_steps_per_episode = 1  # Each episode: pick one method
+
+agent = QLearningAgent(
+    actions=[0, 1, 2],  # 0: wait_10mins, 1: iteration, 2: random
+    alpha=0.1,
+    gamma=0.9,
+    epsilon=0.2
+)
+
+for episode in range(num_episodes):
+    print("\n=== Episode {} ===".format(episode + 1))
+    # Reset mission if needed (not shown here)
+    # Wait for mission to start, etc.
+
+    # Get initial state
+    state = get_state(agent_host)
+    wheat_before = get_wheat_count(agent_host)
+
+    # Choose action (method)
+    action = agent.choose_action(state)
+    print("Chosen method: {}".format(method_names[int(action)]))
+
+    # Run the chosen method
+    methods[action](agent_host)
+
+    # Get new state and reward
+    next_state = get_state(agent_host)
+    wheat_after = get_wheat_count(agent_host)
+    reward = wheat_after - wheat_before  # Reward: wheat collected
+
+    print("Reward: {reward}".format(reward=reward))
+
+    # Q-learning update
+    agent.learn(state, action, reward, next_state)
+
+
+print("\nTraining complete.")
 
 print()
 print("Mission ended")

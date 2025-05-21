@@ -61,21 +61,6 @@ def teleport_agent(agent_host, x, y, z):
     time.sleep(0.2)  # Give time for the teleport to register
 
 
-def find_seeds_slot(agent_host):
-    """
-    Returns the hotbar slot (1-9) containing wheat_seeds, or None if not found.
-    Looks for InventorySlot_{i}_item == "wheat_seeds" for i in 0..8.
-    """
-    world_state = agent_host.getWorldState()
-    if world_state.number_of_observations_since_last_state > 0:
-        msg = world_state.observations[-1].text
-        obs = json.loads(msg)
-        for i in range(9):  # Hotbar slots 0-8
-            if obs.get("InventorySlot_{i}_item".format(i = i)) == "wheat_seeds":
-                return i + 1  # Malmo hotbar commands are 1-indexed
-    return None
-
-
 def iterate_through_farm(agent_host):
     """
     **************************
@@ -88,7 +73,7 @@ def iterate_through_farm(agent_host):
     agent_host.sendCommand("setPitch 90")
     time.sleep(0.2)
 
-    while(1):
+    for _ in range(num_steps):
         iterate_through_farm(agent_host)
 
     
@@ -213,13 +198,90 @@ def attack(agent_host):
         agent_host.sendCommand("attack 1")
         time.sleep(0.01)
         agent_host.sendCommand("attack 0")
+
+def wait_10mins_method(agent_host, waiting_time=6, num_steps=5):
+    """
+    Waits for a specified time (default 10 minutes) before starting the iteration.
+    """
+    agent_host.sendCommand("setPitch 90")
+    time.sleep(0.2)
+    for _ in range(num_steps):
+        time.sleep(waiting_time)
+        iterate_through_farm(agent_host)
+    
         
+def iteration_method(agent_host, num_steps=10):
+    agent_host.sendCommand("setPitch 90")
+    time.sleep(0.2)
+    for _ in range(num_steps):
+        iterate_through_farm(agent_host)
+
+
+def random_method(agent_host, num_steps=10):
+    """
+    Randomly teleports the agent to a new location within the farm area.
+    The agent is teleported to be centered on the new block (X_new + 0.5, Z_new + 0.5).
+    """
+    agent_host.sendCommand("setPitch 90")
+    time.sleep(0.01)
+
+    teleport_agent(agent_host, 0.5, 227, -2.5)
+    current_x = 0
+    current_z = -3
+
+    for _ in range(num_steps):
+        time.sleep(0.5)
+        
+        choice = random.randint(1, 3)
+
+        if choice == 1:
+            attack(agent_host)
+
+        elif choice == 2:
+            plant_seed(agent_host)
+        elif choice == 3:
+            current_x, current_z = perform_random_teleport_step(agent_host, current_x, current_z)
 
     
+def get_state(agent_host):
+    """
+    Returns the current state of the agent based on its inventory and position.
+    """
+    agent_host.sendCommand("setPitch 90")
+    num_wheat = 0
+    wheat_locations = [
+        # Row X = -3
+        (-3, -6), (-3, -5), (-3, -4), (-3, -3), (-3, -2), (-3, -1), (-3, 0),
+        # Row X = -2
+        (-2, -6), (-2, -5), (-2, -4), (-2, -3), (-2, -2), (-2, -1), (-2, 0),
+        # Row X = -1
+        (-1, -6), (-1, -5), (-1, -4), (-1, -3), (-1, -2), (-1, -1), (-1, 0),    
+        # Row X = 0 (note the gap at Z = -3)
+        (0, -6), (0, -5), (0, -4),           (0, -2), (0, -1), (0, 0),
+        # Row X = 1
+        (1, -6), (1, -5), (1, -4), (1, -3), (1, -2), (1, -1), (1, 0),
+        # Row X = 2
+        (2, -6), (2, -5), (2, -4), (2, -3), (2, -2), (2, -1), (2, 0),
+        # Row X = 3
+        (3, -6), (3, -5), (3, -4), (3, -3), (3, -2), (3, -1), (3, 0),
+    ]
 
+    agent_y_position = 227.0  # Agent stands on the same level as the wheat plants
 
-    
+    for x_wheat, z_wheat in wheat_locations:
+        # Calculate agent's target position to be centered on the block
+        agent_target_x = x_wheat + 0.5
+        agent_target_z = z_wheat + 0.5
+        
+        age = get_wheat_age_in_los(agent_host)
+        
+        if age == 7:
+            
+            num_wheat += 1
+            
+        teleport_agent(agent_host, agent_target_x, agent_y_position, agent_target_z)
 
+    return num_wheat
 
 def look_down_harvest_and_replant(agent_host):
     """
@@ -232,3 +294,24 @@ def look_down_harvest_and_replant(agent_host):
     agent_host.sendCommand("use 1")
     time.sleep(0.01)
     agent_host.sendCommand("use 0")
+
+
+def get_wheat_count(agent_host):
+    """
+    Returns the number of wheat
+    """
+    agent_host.sendCommand("setPitch 90")
+    total = 0
+    world_state = agent_host.getWorldState()
+    if world_state.number_of_observations_since_last_state > 0:
+        try:
+            obs_text = world_state.observations[-1].text
+            obs = json.loads(obs_text)
+            for i in range(36):
+                item_key = "InventorySlot_{}_item".format(i)
+                size_key = "InventorySlot_{}_size".format(i)
+                if obs.get(item_key) == "wheat":
+                    total += obs.get(size_key, 0)
+        except Exception as e:
+            print("Error reading inventory:", e)
+    return total
