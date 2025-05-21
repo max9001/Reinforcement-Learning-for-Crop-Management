@@ -99,12 +99,12 @@ def iterate_through_farm(agent_host):
         agent_host_instance: The MalmoPython.AgentHost object.
     """
     wheat_locations = [
-        # Row X = -1
-        (-1, -6), (-1, -5), (-1, -4), (-1, -3), (-1, -2), (-1, -1), (-1, 0),
-        # Row X = -2
-        (-2, -6), (-2, -5), (-2, -4), (-2, -3), (-2, -2), (-2, -1), (-2, 0),
         # Row X = -3
         (-3, -6), (-3, -5), (-3, -4), (-3, -3), (-3, -2), (-3, -1), (-3, 0),
+        # Row X = -2
+        (-2, -6), (-2, -5), (-2, -4), (-2, -3), (-2, -2), (-2, -1), (-2, 0),
+        # Row X = -1
+        (-1, -6), (-1, -5), (-1, -4), (-1, -3), (-1, -2), (-1, -1), (-1, 0),    
         # Row X = 0 (note the gap at Z = -3)
         (0, -6), (0, -5), (0, -4),           (0, -2), (0, -1), (0, 0),
         # Row X = 1
@@ -126,17 +126,13 @@ def iterate_through_farm(agent_host):
         age = get_wheat_age_in_los(agent_host)
         
         if age == 7:
-
-            print("Teleporting to look at wheat at: (" + str(x_wheat) + ", " + str(agent_y_position) + ", " + str(z_wheat) + ") -> Wheat age: (" + str(age) + ")")
             
             look_down_harvest_and_replant(agent_host)
                 
             time.sleep(0.2)
             
         teleport_agent(agent_host, agent_target_x, agent_y_position, agent_target_z)
-        
-        
-        
+
     print("Farm iteration complete.")
 
 
@@ -164,8 +160,6 @@ def perform_random_teleport_step(agent_host, current_x, current_z, agent_y=227.0
                is possible (e.g., surrounded by the forbidden block or edges
                if you add boundary checks), it returns the original coordinates.
     """
-    # Normalize current_x and current_z to be the base integer coordinates of the block
-    # This handles cases where current_x might be something like -0.5 (from previous centering)
     base_current_x = int(round(current_x - 0.5)) if isinstance(current_x, float) and current_x % 1 != 0 else int(current_x)
     base_current_z = int(round(current_z - 0.5)) if isinstance(current_z, float) and current_z % 1 != 0 else int(current_z)
 
@@ -183,65 +177,58 @@ def perform_random_teleport_step(agent_host, current_x, current_z, agent_y=227.0
         next_logical_x = base_current_x + dx
         next_logical_z = base_current_z + dz
 
-        # Check if the *target block coordinates* are the forbidden coordinates
-        # Note: The forbidden block is at y=226, but our agent moves at y=227.
-        # We are checking if the (X,Z) of the target block is (0, -3).
-        # The agent will be teleported *above* this spot.
         if next_logical_x == forbidden_x and next_logical_z == forbidden_z:
-            # print(f"Random step to ({next_logical_x}, {next_logical_z}) is forbidden. Trying another direction.")
             continue  # Skip this move, try the next random direction
 
-        # If you had farm boundaries, you would add checks here:
-        # farm_min_x, farm_max_x = -3, 3
-        # farm_min_z, farm_max_z = -6, 0
-        # if not (farm_min_x <= next_logical_x <= farm_max_x and \
-        #         farm_min_z <= next_logical_z <= farm_max_z):
-        #     # print(f"Random step to ({next_logical_x}, {next_logical_z}) is out of farm bounds. Trying another direction.")
-        #     continue
+        farm_min_x, farm_max_x = -3, 3
+        farm_min_z, farm_max_z = -6, 0
+        if not (farm_min_x <= next_logical_x <= farm_max_x and \
+                farm_min_z <= next_logical_z <= farm_max_z):
+            continue
 
         # Calculate agent's actual teleport target (centered on the new block)
         agent_teleport_x = next_logical_x + 0.5
         agent_teleport_z = next_logical_z + 0.5
-
-#         print(f"Random walk: Current logical ({base_current_x},{base_current_z}) -> New logical ({next_logical_x},{next_logical_z}). Teleporting agent to ({agent_teleport_x}, {agent_y}, {agent_teleport_z})")
         teleport_agent(agent_host, agent_teleport_x, agent_y, agent_teleport_z)
         
         return next_logical_x, next_logical_z # Return the new logical block coordinates
-
-    # If all possible moves were forbidden or out of bounds
-#     print(f"Random walk: No valid move from ({base_current_x},{base_current_z}). Agent remains at current location.")
     return base_current_x, base_current_z # Return original logical coords if no move was made  
     
+
+
+def plant_seed(agent_host):
+    """
+    Makes frank place wheat
+    check makes frank more intelligent; he will only plant if there is no wheat
+    """
+    agent_host.sendCommand("use 1")
+    time.sleep(0.01)
+    agent_host.sendCommand("use 0")
     
+def attack(agent_host):
+    """
+    Makes frank attack for long enough to break wheat. he will only attack if there is wheat
+    """
+    if get_wheat_age_in_los(agent_host) >= 0:
+        agent_host.sendCommand("attack 1")
+        time.sleep(0.01)
+        agent_host.sendCommand("attack 0")
+        
+
     
+
+
     
-    
-    
-  
+
 
 def look_down_harvest_and_replant(agent_host):
     """
-    Makes the agent look straight down, harvest the wheat, and replant seeds.
-    Dynamically finds the hotbar slot with seeds.
+    Makes the agent look straight down, harvest the wheat, and replant seeds..
     """
-    # Look straight down
-    agent_host.sendCommand("setPitch 90")
-    time.sleep(0.2)
-
-    # Harvest (attack)
     agent_host.sendCommand("attack 1")
+    time.sleep(0.01)
     agent_host.sendCommand("attack 0")
-    
     time.sleep(0.1)
-
-    # Find seeds in hotbar
-    # slot = find_seeds_slot(agent_host)
-#     if slot is not None
-#     agent_host.sendCommand("hotbar.0 1")
-#     agent_host.sendCommand("hotbar.0 0")
-#     time.sleep(0.1)
-    # Replant (use seeds)
     agent_host.sendCommand("use 1")
+    time.sleep(0.01)
     agent_host.sendCommand("use 0")
-#     else:
-#         print("No seeds found in hotbar to replant!")
