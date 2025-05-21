@@ -1,20 +1,22 @@
-# import sys
-# sys.path.append("/usr/local/lib/python3.5/dist-packages/malmo/") 
+import sys
 
-#--------------------------------------------------------------------------
+sys.path.append("/home/malmo/MalmoPlatform/Malmo/samples/Python_examples")  # <- update this to match your actual path
+
+# --------------------------------------------------------------------------
 
 import MalmoPython
 import os
-import sys # <<< IMPORTANT: Ensure this is imported
-import random
+import sys  # <<< IMPORTANT: Ensure this is imported
 import time
 import json
-from helper import *
+from helper import get_wheat_age_in_los, teleport_agent, iterate_through_farm, perform_random_teleport_step, \
+    get_wheat_count
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
 
 # <AgentQuitFromCollectingItem>
 #     <Item type="wheat" description="Success! Collected the wheat."/>
+#     <!-- You can add more <Item /> tags here if you want to quit on collecting other items too -->
 # </AgentQuitFromCollectingItem>
 
 mission_xml = '''
@@ -35,7 +37,6 @@ mission_xml = '''
         <ServerHandlers>
             <FlatWorldGenerator generatorString="3;7,225*minecraft:dirt,minecraft:farmland;1;" />
             <DrawingDecorator>
-
                 <!-- Draw wheats -->
                 <DrawBlock x="-1" y="227" z="-6" type="wheat"/>
                 <DrawBlock x="-1" y="227" z="-5" type="wheat"/>
@@ -94,6 +95,8 @@ mission_xml = '''
                 <DrawBlock x="3" y="227" z="-1" type="wheat"/>
                 <DrawBlock x="3" y="227" z="0" type="wheat"/>
 
+
+
                 <!-- Draw water to keep wheat alive-->
                 <DrawBlock x="0" y="226" z="-3" type="water" />
             </DrawingDecorator>
@@ -105,16 +108,18 @@ mission_xml = '''
         <AgentStart>
             <Placement x="0.5" y="227.0" z="3.5" yaw="180" />
             <Inventory>
-                
+
                 <InventoryItem slot="0" type="wheat_seeds" quantity="64"/> 
-                
+
             </Inventory>
         </AgentStart>
         <AgentHandlers>
+            <ContinuousMovementCommands turnSpeedDegs="180"/> 
+            <DiscreteMovementCommands />
             <InventoryCommands />
             <AbsoluteMovementCommands/>
-            <ContinuousMovementCommands turnSpeedDegs="180"/>
-            <AgentQuitFromTimeUp timeLimitMs="10000000" description="Mission Ended (Time Up)."/>
+
+            <AgentQuitFromTimeUp timeLimitMs="100000000" description="Mission Ended (Time Up)."/>
             <ObservationFromGrid>
                 <Grid name="wheatField">
                     <min x="-3" y="225" z="-6"/>
@@ -122,6 +127,7 @@ mission_xml = '''
                 </Grid>
             </ObservationFromGrid>
             <ObservationFromRay />
+            <ObservationFromFullInventory/>
         </AgentHandlers>
     </AgentSection>
 </Mission>
@@ -130,7 +136,7 @@ mission_xml = '''
 # --- Agent Setup ---
 agent_host = MalmoPython.AgentHost()
 try:
-    agent_host.parse(sys.argv) # sys.argv needs 'import sys'
+    agent_host.parse(sys.argv)  # sys.argv needs 'import sys'
 except RuntimeError as e:
     print('ERROR parsing arguments:', e)
     print(agent_host.getUsage())
@@ -142,10 +148,14 @@ if agent_host.receivedArgument("help"):
 # --- Setup ClientPool ---
 # This is generally more robust for starting missions
 my_client_pool = MalmoPython.ClientPool()
-my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000)) # Default Malmo port
+my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000))  # Default Malmo port
 
 my_mission = MalmoPython.MissionSpec(mission_xml, True)
-my_mission_record = MalmoPython.MissionRecordSpec()
+my_mission_record = MalmoPython.MissionRecordSpec()  # Not recording anything specific here
+
+# Experiment: Request video to see if it forces a more stable client connection
+# my_mission.requestVideo(320, 240)
+# my_mission.setViewpoint(0) # Agent's perspective
 
 max_retries = 3
 for retry in range(max_retries):
@@ -172,7 +182,7 @@ while not world_state.has_mission_begun:
     print(".", end="")
     time.sleep(0.1)
     world_state = agent_host.getWorldState()
-    for error in world_state.errors: # Check for errors reported by Malmo
+    for error in world_state.errors:  # Check for errors reported by Malmo
         print("\nERROR during mission start:", error.text)
         # If there are errors here, it often means an XML issue or client connection problem
 print("\nMission started!")
@@ -181,30 +191,14 @@ print("\nMission started!")
 
 # --- Agent Action Sequence ---
 
-agent_host.sendCommand("setPitch 90")
-time.sleep(0.01)
-
-teleport_agent(agent_host, 0.5, 227, -2.5)
-current_x = 0
-current_z = -3
-
-while(1):
+teleport_agent(agent_host, -3, 227, -3)
+time.sleep(1)
+while agent_host.getWorldState().is_mission_running:
+    time.sleep(600)
+    iterate_through_farm(agent_host)
     time.sleep(0.5)
-    
-    choice = random.randint(1, 3)
-
-    if choice == 1:
-        attack(agent_host)
-
-    elif choice == 2:
-        plant_seed(agent_host)
-    elif choice == 3:
-        current_x, current_z = perform_random_teleport_step(agent_host, current_x, current_z)
-        
-
-    # iterate_through_farm(agent_host)
-
-
+    wheat_count = get_wheat_count(agent_host)
+    print("Wheat collected so far:", wheat_count)
 
 print()
 print("Mission ended")
