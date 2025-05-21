@@ -199,7 +199,7 @@ def attack(agent_host):
         time.sleep(0.01)
         agent_host.sendCommand("attack 0")
 
-def wait_10mins_method(agent_host, waiting_time=6, num_steps=5):
+def wait_10mins_method(agent_host, waiting_time=12, num_steps=5):
     """
     Waits for a specified time (default 10 minutes) before starting the iteration.
     """
