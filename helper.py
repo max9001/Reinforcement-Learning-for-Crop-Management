@@ -220,20 +220,20 @@ def get_wheat_count(agent_host):
     """
     Returns the number of wheat
     """
+    total = 0
     world_state = agent_host.getWorldState()
     if world_state.number_of_observations_since_last_state > 0:
         try:
             obs_text = world_state.observations[-1].text
-            # print(obs_text)
             obs = json.loads(obs_text)
-            for i in range(9):
+            for i in range(36):
                 item_key = "InventorySlot_{}_item".format(i)
                 size_key = "InventorySlot_{}_size".format(i)
                 if obs.get(item_key) == "wheat":
-                    return obs.get(size_key, 0)
+                    total += obs.get(size_key, 0)
         except Exception as e:
             print("Error reading inventory:", e)
-    return 0
+    return total
 
 
 def look_down_harvest_and_replant(agent_host):
