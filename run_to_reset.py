@@ -1,5 +1,5 @@
-# import sys
-# sys.path.append("/usr/local/lib/python3.5/dist-packages/malmo/")  # <- update this to match your actual path
+import sys
+sys.path.append("/home/malmo/MalmoPlatform/Malmo/samples/Python_examples") # <- update this to match your actual path
 
 #--------------------------------------------------------------------------
 
