@@ -224,7 +224,7 @@ def step(agent_host, action_idx, x, z):
             reward = 1
         elif age >= 0:
             reward = -1
-        attack(agent_host)
+        look_down_harvest_and_replant(agent_host)
     elif action == 5:
         plant_seed(agent_host)
     elif action == 6:

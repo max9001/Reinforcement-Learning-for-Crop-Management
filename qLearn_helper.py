@@ -63,6 +63,7 @@ def teleport_agent(agent_host, x, y, z):
 
 
 def get_state(x, z, agent_host):
+    agent_host.sendCommand("setPitch 90")
     age = get_wheat_age_in_los(agent_host)
     age = -1 if age is None else age
 
@@ -98,3 +99,15 @@ def attack(agent_host):
         agent_host.sendCommand("attack 1")
         time.sleep(0.01)
         agent_host.sendCommand("attack 0")
+
+def look_down_harvest_and_replant(agent_host):
+    """
+    Makes the agent look straight down, harvest the wheat, and replant seeds..
+    """
+    agent_host.sendCommand("attack 1")
+    time.sleep(0.01)
+    agent_host.sendCommand("attack 0")
+    time.sleep(0.1)
+    agent_host.sendCommand("use 1")
+    time.sleep(0.01)
+    agent_host.sendCommand("use 0")
