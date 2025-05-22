@@ -194,7 +194,7 @@ print("\nMission started!")
 teleport_agent(agent_host, -3, 227, -3)
 time.sleep(1)
 while agent_host.getWorldState().is_mission_running:
-    time.sleep(600)
+    time.sleep(12)
     iterate_through_farm(agent_host)
     time.sleep(0.5)
     wheat_count = get_wheat_count(agent_host)
