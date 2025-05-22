@@ -11,6 +11,7 @@ import time
 import json
 from qLearn_helper import *
 from q_agent import QLearningAgent
+from action_helper import *
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
 
@@ -203,9 +204,18 @@ ACTIONS = [
     "wait"  # waiting for maturity
 ]
 
+actions = [
+    move_up,
+    move_down,
+    move_left,
+    move_right,
+    harvest,
+    plant,
+    wait
+]
 
 # define actions with their rewards
-def step(agent_host, action_idx, x, z):
+"""def step(agent_host, action_idx, x, z):
     #     action = ACTIONS[action_idx]
     reward = 0
     next_x, next_z = x, z
@@ -231,7 +241,9 @@ def step(agent_host, action_idx, x, z):
         time.sleep(0.5)
 
     teleport_agent(agent_host, next_x + 0.5, 227, next_z + 0.5)
-    return (next_x, next_z), reward
+    return (next_x, next_z), reward"""
+def step(agent_host, action_idx, x, z):
+    return actions[action_idx](agent_host, x, z)
 
 
 # --- RL Training Loop ---
