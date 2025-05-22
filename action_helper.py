@@ -1,4 +1,4 @@
-from helper import *
+from qLearn_helper import *
 
 def move_up(agent_host, x, z):
     new_z = z - 1
@@ -35,6 +35,6 @@ def plant(agent_host, x, z):
     plant_seed(agent_host)
     return x, z, 0
 
-def wait(x, z):
+def wait(agent_host, x, z):
     time.sleep(0.5)
     return x, z, 0

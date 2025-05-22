@@ -243,7 +243,8 @@ actions = [
     teleport_agent(agent_host, next_x + 0.5, 227, next_z + 0.5)
     return (next_x, next_z), reward"""
 def step(agent_host, action_idx, x, z):
-    return actions[action_idx](agent_host, x, z)
+    next_x, next_z, reward = actions[action_idx](agent_host, x, z)
+    return (next_x, next_z), reward
 
 
 # --- RL Training Loop ---
