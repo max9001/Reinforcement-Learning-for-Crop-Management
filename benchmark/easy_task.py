@@ -9,7 +9,7 @@ import sys # <<< IMPORTANT: Ensure this is imported
 import random
 import time
 import json
-from helper import *
+from benchmark.helper import *
 from q_agent import QLearningAgent
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>

@@ -9,7 +9,7 @@ import sys # <<< IMPORTANT: Ensure this is imported
 import random
 import time
 import json
-from helper import *
+from benchmark.helper import *
 
 if sys.version_info[0] == 2:
     sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
