@@ -269,3 +269,101 @@ for episode in range(num_episodes):
 print("\nTraining complete.")
 print("\nMission ended")
 # Mission has ended.
+
+
+
+
+
+
+# =================================
+# old version saving fro merge
+
+
+# ACTIONS = [
+#     "move_up",
+#     "move_down",
+#     "move_left",
+#     "move_right",
+#     "harvest",  # equals attack
+#     "plant",
+#     "wait"  # waiting for maturity
+# ]
+
+# actions = [
+#     move_up,
+#     move_down,
+#     move_left,
+#     move_right,
+#     harvest,
+#     plant,
+#     wait
+# ]
+
+# # define actions with their rewards
+# """def step(agent_host, action_idx, x, z):
+#     #     action = ACTIONS[action_idx]
+#     reward = 0
+#     next_x, next_z = x, z
+
+#     if action == 0:
+#         next_z = z - 1
+#     elif action == 1:
+#         next_z = z + 1
+#     elif action == 2:
+#         next_x = x - 1
+#     elif action == 3:
+#         next_x = x + 1
+#     elif action == 4:
+#         age = get_wheat_age_in_los(agent_host)
+#         if age == 7:
+#             reward = 1
+#         elif age >= 0:
+#             reward = -1
+#         look_down_harvest_and_replant(agent_host)
+#     elif action == 5:
+#         plant_seed(agent_host)
+#     elif action == 6:
+#         time.sleep(0.5)
+
+#     teleport_agent(agent_host, next_x + 0.5, 227, next_z + 0.5)
+#     return (next_x, next_z), reward"""
+# def step(agent_host, action_idx, x, z):
+#     next_x, next_z, reward = actions[action_idx](agent_host, x, z)
+#     return (next_x, next_z), reward
+
+
+# # --- RL Training Loop ---
+
+# num_episodes = 10  # Increase for real training
+# max_steps_per_episode = 50  # number of actions can be performed per episode
+
+# agent = QLearningAgent(
+#     actions=list(range(len(ACTIONS))),
+#     alpha=0.1,
+#     gamma=0.9,
+#     epsilon=0.2
+# )
+
+# for episode in range(num_episodes):
+#     #     print(f"\n=== Episode {episode + 1} ===")
+
+#     x, z = 0, -3
+#     teleport_agent(agent_host, x + 0.5, 227, z + 0.5)
+
+#     state = get_state(x, z, agent_host)
+
+#     for t in range(max_steps_per_episode):
+#         action = agent.choose_action(state)
+#         (next_x, next_z), reward = step(agent_host, action, x, z)
+#         next_state = get_state(next_x, next_z, agent_host)
+
+#         agent.learn(state, action, reward, next_state)
+
+#         #         print(f"Step {t}: action={ACTIONS[action]}, reward={reward}, state={next_state}")
+
+#         state = next_state
+#         x, z = next_x, next_z
+
+# print("\nTraining complete.")
+# print("\nMission ended")
+# # Mission has ended.
