@@ -241,3 +241,50 @@ print("\nTraining complete.")
 print()
 print("Mission ended")
 # Mission has ended.
+
+
+
+"""
+agent_host.sendCommand("setPitch 90")
+time.sleep(0.01)
+
+teleport_agent(agent_host, 0.5, 227, -2.5)
+current_x = 0
+current_z = -3
+
+start_time = get_ticks_since_mission_start(agent_host)
+print(start_time)
+
+print_counter = 0
+
+while agent_host.getWorldState().is_mission_running:
+    
+#     print_counter += 1
+# #     time.sleep(0.5)
+    
+#     choice = random.randint(1, 3)
+
+#     if choice == 1:
+#         time.sleep(0.2) 
+#         attack(agent_host)
+#     elif choice == 2:
+#         time.sleep(0.2) 
+#         plant_seed(agent_host)
+#     elif choice == 3:
+#         time.sleep(0.2) 
+#         current_x, current_z = perform_random_teleport_step(agent_host, current_x, current_z)        
+
+    time.sleep(59)
+    
+    iterate_through_farm(agent_host)
+    
+#     if (print_counter % 40 == 0):
+    time.sleep(0.5)  
+    ticks = get_ticks_since_mission_start(agent_host)
+    ticks = ticks - start_time
+    time.sleep(0.5)  
+    wheats = get_inventory_item_count(agent_host, "wheat")
+    print("({}, {})".format(ticks, wheats))
+        
+    time.sleep(0.5)  
+"""
