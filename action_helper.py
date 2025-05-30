@@ -38,3 +38,6 @@ def plant(agent_host, x, z):
 def wait(agent_host, x, z):
     time.sleep(0.5)
     return x, z, 0
+
+
+

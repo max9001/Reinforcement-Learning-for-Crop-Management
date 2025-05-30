@@ -3,7 +3,9 @@
 
 #--------------------------------------------------------------------------
 
-import malmo.MalmoPython as MalmoPython # <<< IMPORTANT: Change to import MalmoPython if not using Docker
+# import malmo.MalmoPython as MalmoPython # <<< IMPORTANT: Change to import MalmoPython if not using Docker
+
+import MalmoPython  # <<< IMPORTANT: Change to import MalmoPython if not using Docker
 import os
 import sys # <<< IMPORTANT: Ensure this is imported
 import random
@@ -17,6 +19,12 @@ from q_agent import QLearningAgent
 # <AgentQuitFromCollectingItem>
 #     <Item type="wheat" description="Success! Collected the wheat."/>
 # </AgentQuitFromCollectingItem>
+
+
+
+
+
+
 
 mission_xml = '''
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -193,177 +201,117 @@ print("\nMission started!")
 # --- RL Setup ---
 # Define your action space (index to method)
 
-ACTIONS = [
-    "move_up",
-    "move_down",
-    "move_left",
-    "move_right",
-    "harvest",      # equals attack
-    "plant",
-    "wait"          # waiting for maturity
-]
-
-
-# define actions with their rewards
-def step(agent_host, action_idx, x, z):
-#     action = ACTIONS[action_idx]
-    reward = 0
-    next_x, next_z = x, z
-
-    if action == 0:
-        next_z = z - 1
-    elif action == 1:
-        next_z = z + 1
-    elif action == 2:
-        next_x = x - 1
-    elif action == 3:
-        next_x = x + 1
-    elif action == 4:
-        age = get_wheat_age_in_los(agent_host)
-        if age == 7:
-            reward = 1
-        elif age >= 0:
-            reward = -1
-        look_down_harvest_and_replant(agent_host)
-    elif action == 5:
-        plant_seed(agent_host)
-    elif action == 6:
-        time.sleep(0.5)
-
-    teleport_agent(agent_host, next_x + 0.5, 227, next_z + 0.5)
-    return (next_x, next_z), reward
-
-# --- RL Training Loop ---
-
-num_episodes = 10  # Increase for real training
-max_steps_per_episode = 50  # number of actions can be performed per episode
-
-agent = QLearningAgent(
-    actions=list(range(len(ACTIONS))),
-    alpha=0.1,
-    gamma=0.9,
-    epsilon=0.2
-)
-
-for episode in range(num_episodes):
-#     print(f"\n=== Episode {episode + 1} ===")
-    
-    x, z = 0, -3
-    teleport_agent(agent_host, x + 0.5, 227, z + 0.5)
-
-    state = get_state(x, z, agent_host)
-
-    for t in range(max_steps_per_episode):
-        action = agent.choose_action(state)
-        (next_x, next_z), reward = step(agent_host, action, x, z)
-        next_state = get_state(next_x, next_z, agent_host)
-
-        agent.learn(state, action, reward, next_state)
-
-#         print(f"Step {t}: action={ACTIONS[action]}, reward={reward}, state={next_state}")
-
-        state = next_state
-        x, z = next_x, next_z
-        
-
-print("\nTraining complete.")
-print("\nMission ended")
-# Mission has ended.
-
-
-
-
-
-
-# =================================
-# old version saving fro merge
-
-
 # ACTIONS = [
 #     "move_up",
 #     "move_down",
 #     "move_left",
 #     "move_right",
-#     "harvest",  # equals attack
+#     "harvest",      # equals attack
 #     "plant",
-#     "wait"  # waiting for maturity
+#     "wait"          # waiting for maturity
 # ]
 
-# actions = [
-#     move_up,
-#     move_down,
-#     move_left,
-#     move_right,
-#     harvest,
-#     plant,
-#     wait
-# ]
-
-# # define actions with their rewards
-# """def step(agent_host, action_idx, x, z):
-#     #     action = ACTIONS[action_idx]
-#     reward = 0
-#     next_x, next_z = x, z
-
-#     if action == 0:
-#         next_z = z - 1
-#     elif action == 1:
-#         next_z = z + 1
-#     elif action == 2:
-#         next_x = x - 1
-#     elif action == 3:
-#         next_x = x + 1
-#     elif action == 4:
-#         age = get_wheat_age_in_los(agent_host)
-#         if age == 7:
-#             reward = 1
-#         elif age >= 0:
-#             reward = -1
-#         look_down_harvest_and_replant(agent_host)
-#     elif action == 5:
-#         plant_seed(agent_host)
-#     elif action == 6:
-#         time.sleep(0.5)
-
-#     teleport_agent(agent_host, next_x + 0.5, 227, next_z + 0.5)
-#     return (next_x, next_z), reward"""
-# def step(agent_host, action_idx, x, z):
-#     next_x, next_z, reward = actions[action_idx](agent_host, x, z)
-#     return (next_x, next_z), reward
 
 
-# # --- RL Training Loop ---
 
-# num_episodes = 10  # Increase for real training
-# max_steps_per_episode = 50  # number of actions can be performed per episode
+# --- RL Training Loop ---
+# Assuming agent_host is initialized and mission is started
+# Assuming record_initial_mission_time() has been called
 
-# agent = QLearningAgent(
-#     actions=list(range(len(ACTIONS))),
-#     alpha=0.1,
-#     gamma=0.9,
-#     epsilon=0.2
-# )
+num_episodes = 1000  # Increase significantly for real training
+max_steps_per_episode = 100 # Max actions per episode
 
-# for episode in range(num_episodes):
-#     #     print(f"\n=== Episode {episode + 1} ===")
+# Initialize Q-learning agent
+q_agent = QLearningAgent(
+    actions_list=list(range(len(ACTIONS_LIST))), # Pass indices [0, 1, ..., 6]
+    alpha=0.1,      # Learning rate
+    gamma=0.9,      # Discount factor for future rewards
+    epsilon=1.0,    # Initial exploration rate (start high)
+    epsilon_decay=0.999, # Decay epsilon slowly
+    min_epsilon=0.05   # Minimum exploration rate
+)
 
-#     x, z = 0, -3
-#     teleport_agent(agent_host, x + 0.5, 227, z + 0.5)
+# For tracking rewards
+episode_rewards = []
 
-#     state = get_state(x, z, agent_host)
+# Ensure VALID_FARM_COORDINATES and ILLEGAL_COORD_MARKER are defined
+# Ensure helper functions like get_state_active_scan_5_points, teleport_agent are defined/imported
 
-#     for t in range(max_steps_per_episode):
-#         action = agent.choose_action(state)
-#         (next_x, next_z), reward = step(agent_host, action, x, z)
-#         next_state = get_state(next_x, next_z, agent_host)
+# Starting position for episodes (can be randomized within VALID_FARM_COORDINATES)
+initial_farm_spots = list(VALID_FARM_COORDINATES)
 
-#         agent.learn(state, action, reward, next_state)
 
-#         #         print(f"Step {t}: action={ACTIONS[action]}, reward={reward}, state={next_state}")
+for episode in range(num_episodes):
+    # Reset agent to a random valid starting spot for each episode
+    start_x, start_z = random.choice(initial_farm_spots)
+    teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
+    time.sleep(0.2) # Settle after teleport
 
-#         state = next_state
-#         x, z = next_x, next_z
+    current_x, current_z = start_x, start_z
+    current_cumulative_reward = 0
+    
+    # Get initial state
+    # Important: ensure agent looks down before get_state if it relies on LineOfSight for current spot
+    # agent_host.sendCommand("setPitch 90") 
+    # time.sleep(0.1)
+    current_state = get_state_active_scan_5_points(agent_host, current_x, current_z)
+    # agent_host.sendCommand("setPitch 0") # Look forward again, or manage pitch within step/actions
+    # time.sleep(0.1)
 
-# print("\nTraining complete.")
-# print("\nMission ended")
-# # Mission has ended.
+    print("--- Episode: {} ---".format(episode + 1))
+    print("Initial state at ({}, {}):".format(current_x, current_z))
+    print_intuitive_state_5_points(current_state)
+
+
+    for step_num in range(max_steps_per_episode):
+        if not agent_host.getWorldState().is_mission_running:
+            print("Mission ended prematurely in episode {} at step {}.".format(episode + 1, step_num))
+            break
+
+        action_idx = q_agent.choose_action(current_state)
+        
+        # Execute action, get next position and reward
+        # Pass agent_host to the step function
+        (next_x, next_z), reward = step(agent_host, action_idx, current_x, current_z, current_state) # ADD agent_host HERE
+        current_cumulative_reward += reward
+        
+        # Get the state for the new position
+        next_state = get_state_active_scan_5_points(agent_host, next_x, next_z) # Already passing agent_host here
+
+        # Agent learns
+        q_agent.learn(current_state, action_idx, reward, next_state)
+
+        # Update for next iteration
+        current_state = next_state
+        current_x, current_z = next_x, next_z
+
+        # Print status (can be made less verbose for long training)
+        print("Ep {}, Step {}: Agent at ({},{}), Action: {}, Reward: {:.2f}, TotalEpReward: {:.2f}, Epsilon: {:.3f}".format(
+            episode + 1, step_num + 1, current_x, current_z, ACTION_NAMES[action_idx], reward, current_cumulative_reward, q_agent.epsilon
+        ))
+        # print_intuitive_state_5_points(current_state) # Optional: print state every step
+
+        # Small delay for game to process, can be adjusted
+        # MsPerTick=1 is very fast, so this sleep might be many game ticks.
+        time.sleep(0.05) 
+
+    episode_rewards.append(current_cumulative_reward)
+    q_agent.decay_epsilon() # Decay epsilon at the end of each episode
+    print("End of Episode {}. Total Reward: {:.2f}. Epsilon: {:.3f}".format(episode + 1, current_cumulative_reward, q_agent.epsilon))
+    # Optional: Save Q-table periodically
+    # if (episode + 1) % 100 == 0:
+    #     save_q_table(q_agent.q_table, "q_table_episode_{}.pkl".format(episode + 1))
+
+
+print("\n--- Training Complete ---")
+# print("Episode rewards:", episode_rewards)
+# You can plot episode_rewards to see learning progress.
+# You might want to save the final Q-table here.
+
+# Make sure mission ends if it hasn't already (e.g. if AgentQuitFromTimeUp is very long)
+if agent_host.getWorldState().is_mission_running:
+    agent_host.sendCommand("quit")
+
+
+
+
