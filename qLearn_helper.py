@@ -419,3 +419,67 @@ def step(agent_host_instance, action_index, current_x, current_z, current_state_
         print("INFO: Action Wait.")
 
     return (next_x, next_z), reward
+
+
+
+
+def get_inventory_item_count(agent_host_instance, item_name_to_find):
+    """
+    Counts the total quantity of a specific item in the agent's main inventory.
+    Compatible with older Python versions (no f-strings).
+    """
+    total_quantity = 0
+    # print("DEBUG: Attempting to count '{}'.".format(item_name_to_find)) # You can keep or remove this outer debug
+    world_state = agent_host_instance.getWorldState()
+
+    if world_state.number_of_observations_since_last_state > 0:
+        msg = world_state.observations[-1].text
+        # print("DEBUG: Raw observation for inventory: {}".format(msg)) 
+        try:
+            observations = json.loads(msg)
+            
+            if "inventory" in observations: # This is for flat="false"
+                # print("DEBUG: Found 'inventory' key. Content: {}".format(observations['inventory'])) # You can keep or remove this
+                for item_slot in observations["inventory"]:
+                    item_type = item_slot.get("type")
+                    inventory_source = item_slot.get("inventory")
+                    quantity = item_slot.get("quantity", 0)
+
+                    if inventory_source == "inventory" and item_type == item_name_to_find: # <--- THE FIX
+                        # print("DEBUG: MATCH! Adding {} of {} from player inventory.".format(quantity, item_name_to_find)) # Optional match print
+                        total_quantity += quantity
+            else:
+                # Fallback for flat=true format (though your log shows flat=false is working)
+                # print("DEBUG: 'inventory' key (for flat=false) NOT found. Checking for flat=true format...")
+                found_in_flat_format = False
+                for i in range(40): 
+                    item_key = "InventorySlot_{}_item".format(i)
+                    size_key = "InventorySlot_{}_size".format(i)
+                    if item_key in observations and observations[item_key] == item_name_to_find:
+                        current_quantity_str = observations.get(size_key, "0")
+                        try:
+                            current_quantity = int(current_quantity_str)
+                        except ValueError:
+                            # print("WARNING: Could not convert flat inventory size '{}' to int for slot {}.".format(current_quantity_str, i))
+                            current_quantity = 0
+                        total_quantity += current_quantity
+                        found_in_flat_format = True
+                
+                if not found_in_flat_format:
+                    available_keys = []
+                    if isinstance(observations, dict): 
+                        available_keys = list(observations.keys())
+                    # print("DEBUG: Item '{}' not found in any known inventory format. Available keys in observation: {}".format(item_name_to_find, available_keys))
+
+
+        except json.JSONDecodeError:
+            # print("ERROR: JSONDecodeError while parsing inventory: {}".format(msg))
+            return 0 
+        except Exception as e:
+            # print("ERROR: {} while processing inventory: {}".format(type(e).__name__, e))
+            return 0
+    # else:
+        # print("DEBUG: No new observations received for inventory check.")
+
+    # print("DEBUG: Final count for '{}': {}".format(item_name_to_find, total_quantity)) # You can keep or remove this
+    return total_quantity

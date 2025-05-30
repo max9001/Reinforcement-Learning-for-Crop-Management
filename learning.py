@@ -13,6 +13,7 @@ import time
 import json
 from qLearn_helper import *
 from q_agent import QLearningAgent
+import matplotlib.pyplot as plt
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
 
@@ -33,7 +34,7 @@ mission_xml = '''
         <Summary>Frank's Test - Step 2</Summary>
     </About>
     <ModSettings>
-        <MsPerTick>1</MsPerTick>
+        <MsPerTick>3</MsPerTick>
     </ModSettings>
     <ServerSection>
         <ServerInitialConditions>
@@ -211,17 +212,6 @@ print("\nMission started!")
 #     "wait"          # waiting for maturity
 # ]
 
-
-
-
-# --- RL Training Loop ---
-# Assuming agent_host is initialized and mission is started
-# Assuming record_initial_mission_time() has been called
-
-num_episodes = 1000  # Increase significantly for real training
-max_steps_per_episode = 100 # Max actions per episode
-
-# Initialize Q-learning agent
 q_agent = QLearningAgent(
     actions_list=list(range(len(ACTIONS_LIST))), # Pass indices [0, 1, ..., 6]
     alpha=0.1,      # Learning rate
@@ -231,37 +221,48 @@ q_agent = QLearningAgent(
     min_epsilon=0.05   # Minimum exploration rate
 )
 
-# For tracking rewards
+# learning.py
+
+# ... (your imports and setup, agent_host, q_agent, etc.) ...
+# Ensure get_inventory_item_count is imported or defined
+# from qLearn_helper import get_inventory_item_count, ... (and other necessary functions)
+
+# --- RL Training Loop ---
+num_episodes = 1000
+max_steps_per_episode = 100
+
 episode_rewards = []
+episode_wheat_collected = [] # New list to track wheat collected per episode
 
-# Ensure VALID_FARM_COORDINATES and ILLEGAL_COORD_MARKER are defined
-# Ensure helper functions like get_state_active_scan_5_points, teleport_agent are defined/imported
-
-# Starting position for episodes (can be randomized within VALID_FARM_COORDINATES)
-initial_farm_spots = list(VALID_FARM_COORDINATES)
-
+initial_farm_spots = list(VALID_FARM_COORDINATES) # Make sure VALID_FARM_COORDINATES is defined
 
 for episode in range(num_episodes):
-    # Reset agent to a random valid starting spot for each episode
+    # Reset agent to a random valid starting spot
     start_x, start_z = random.choice(initial_farm_spots)
     teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
-    time.sleep(0.2) # Settle after teleport
+    time.sleep(0.2) 
 
     current_x, current_z = start_x, start_z
     current_cumulative_reward = 0
     
-    # Get initial state
-    # Important: ensure agent looks down before get_state if it relies on LineOfSight for current spot
-    # agent_host.sendCommand("setPitch 90") 
-    # time.sleep(0.1)
+    # --- Track Wheat Collection ---
+    # Get wheat count at the START of the episode
+    # Ensure a fresh world state for this initial inventory check
+    time.sleep(0.1) # Allow observations to settle if needed
+    initial_wheat_count = get_inventory_item_count(agent_host, "wheat")
+    if initial_wheat_count < 0: # Handle potential error from get_inventory_item_count
+        print("WARNING: Error getting initial wheat count for episode {}. Setting to 0.".format(episode + 1))
+        initial_wheat_count = 0
+    
     current_state = get_state_active_scan_5_points(agent_host, current_x, current_z)
-    # agent_host.sendCommand("setPitch 0") # Look forward again, or manage pitch within step/actions
-    # time.sleep(0.1)
 
-    print("--- Episode: {} ---".format(episode + 1))
-    print("Initial state at ({}, {}):".format(current_x, current_z))
+    # --- Obnoxious Start of Episode Separator ---
+    print("\n" + "=" * 70)
+    print("========== S T A R T   O F   E P I S O D E : {:>5} ==========".format(episode + 1))
+    print("=" * 70)
+    print("Initial position: ({}, {}), Initial wheat in inventory: {}".format(current_x, current_z, initial_wheat_count))
     print_intuitive_state_5_points(current_state)
-
+    print("-" * 70) # Sub-separator
 
     for step_num in range(max_steps_per_episode):
         if not agent_host.getWorldState().is_mission_running:
@@ -270,48 +271,65 @@ for episode in range(num_episodes):
 
         action_idx = q_agent.choose_action(current_state)
         
-        # Execute action, get next position and reward
-        # Pass agent_host to the step function
-        (next_x, next_z), reward = step(agent_host, action_idx, current_x, current_z, current_state) # ADD agent_host HERE
+        (next_x, next_z), reward = step(agent_host, action_idx, current_x, current_z, current_state)
         current_cumulative_reward += reward
         
-        # Get the state for the new position
-        next_state = get_state_active_scan_5_points(agent_host, next_x, next_z) # Already passing agent_host here
-
-        # Agent learns
+        next_state = get_state_active_scan_5_points(agent_host, next_x, next_z)
         q_agent.learn(current_state, action_idx, reward, next_state)
 
-        # Update for next iteration
         current_state = next_state
         current_x, current_z = next_x, next_z
 
-        # Print status (can be made less verbose for long training)
-        print("Ep {}, Step {}: Agent at ({},{}), Action: {}, Reward: {:.2f}, TotalEpReward: {:.2f}, Epsilon: {:.3f}".format(
-            episode + 1, step_num + 1, current_x, current_z, ACTION_NAMES[action_idx], reward, current_cumulative_reward, q_agent.epsilon
+        # The existing per-step print statement (can be commented out for less verbose output during long runs)
+        print("Ep {}, Step {}: Agent@({}, {}), Act:{}, Rew:{:.1f}, TotRew:{:.1f}, Eps:{:.3f}".format(
+            episode + 1, step_num + 1, current_x, current_z, ACTION_NAMES[action_idx], 
+            reward, current_cumulative_reward, q_agent.epsilon
         ))
-        # print_intuitive_state_5_points(current_state) # Optional: print state every step
+        # if (step_num + 1) % 10 == 0: # Optional: print intuitive state every 10 steps
+            # print_intuitive_state_5_points(current_state)
 
-        # Small delay for game to process, can be adjusted
-        # MsPerTick=1 is very fast, so this sleep might be many game ticks.
         time.sleep(0.05) 
 
+    # --- End of Episode ---
     episode_rewards.append(current_cumulative_reward)
-    q_agent.decay_epsilon() # Decay epsilon at the end of each episode
-    print("End of Episode {}. Total Reward: {:.2f}. Epsilon: {:.3f}".format(episode + 1, current_cumulative_reward, q_agent.epsilon))
-    # Optional: Save Q-table periodically
-    # if (episode + 1) % 100 == 0:
-    #     save_q_table(q_agent.q_table, "q_table_episode_{}.pkl".format(episode + 1))
+    q_agent.decay_epsilon()
 
+    # Get wheat count at the END of the episode
+    final_wheat_count = get_inventory_item_count(agent_host, "wheat")
+    if final_wheat_count < 0: # Handle potential error
+        print("WARNING: Error getting final wheat count for episode {}. Assuming no change.".format(episode + 1))
+        final_wheat_count = initial_wheat_count # Or 0, depending on how you want to handle errors
+        
+    wheat_collected_this_episode = final_wheat_count - initial_wheat_count
+    episode_wheat_collected.append(wheat_collected_this_episode)
 
-print("\n--- Training Complete ---")
-# print("Episode rewards:", episode_rewards)
-# You can plot episode_rewards to see learning progress.
-# You might want to save the final Q-table here.
+    # --- Obnoxious End of Episode Separator and Info ---
+    print("-" * 70) # Sub-separator
+    print("*" * 70)
+    print("********** E N D   O F   E P I S O D E : {:>5} **********".format(episode + 1))
+    print("Total Reward for Episode: {:.2f}".format(current_cumulative_reward))
+    print("Wheat Collected This Episode: {}".format(wheat_collected_this_episode))
+    print("Total Wheat in Inventory: {}".format(final_wheat_count))
+    print("Current Epsilon: {:.4f}".format(q_agent.epsilon))
+    print("*" * 70)
 
-# Make sure mission ends if it hasn't already (e.g. if AgentQuitFromTimeUp is very long)
+# ... (rest of your script, e.g., saving Q-table, plotting rewards) ...
+
+# Example of plotting at the end (requires matplotlib)
+
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plt.plot(episode_rewards)
+plt.title('Episode Rewards')
+plt.xlabel('Episode')
+plt.ylabel('Total Reward')
+plt.subplot(1, 2, 2)
+plt.plot(episode_wheat_collected)
+plt.title('Wheat Collected Per Episode')
+plt.xlabel('Episode')
+plt.ylabel('Wheat Collected')
+plt.tight_layout()
+plt.show()
+
 if agent_host.getWorldState().is_mission_running:
     agent_host.sendCommand("quit")
-
-
-
-
