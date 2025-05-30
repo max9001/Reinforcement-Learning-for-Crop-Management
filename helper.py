@@ -61,6 +61,22 @@ def teleport_agent(agent_host, x, y, z):
     time.sleep(0.2)  # Give time for the teleport to register
 
 
+
+def find_seeds_slot(agent_host):
+    """
+    Returns the hotbar slot (1-9) containing wheat_seeds, or None if not found.
+    Looks for InventorySlot_{i}_item == "wheat_seeds" for i in 0..8.
+    """
+    world_state = agent_host.getWorldState()
+    if world_state.number_of_observations_since_last_state > 0:
+        msg = world_state.observations[-1].text
+        obs = json.loads(msg)
+        for i in range(9):  # Hotbar slots 0-8
+            if obs.get("InventorySlot_{i}_item".format(i = i)) == "wheat_seeds":
+                return i + 1  # Malmo hotbar commands are 1-indexed
+    return None
+
+
 def iterate_through_farm(agent_host):
     """
     **************************
@@ -315,3 +331,109 @@ def get_wheat_count(agent_host):
         except Exception as e:
             print("Error reading inventory:", e)
     return total
+
+
+def get_inventory_item_count(agent_host_instance, item_name_to_find):
+    """
+    Counts the total quantity of a specific item in the agent's main inventory.
+    Compatible with older Python versions (no f-strings).
+    """
+    total_quantity = 0
+    # print("DEBUG: Attempting to count '{}'.".format(item_name_to_find)) # You can keep or remove this outer debug
+    world_state = agent_host_instance.getWorldState()
+
+    if world_state.number_of_observations_since_last_state > 0:
+        msg = world_state.observations[-1].text
+        # print("DEBUG: Raw observation for inventory: {}".format(msg)) 
+        try:
+            observations = json.loads(msg)
+            
+            if "inventory" in observations: # This is for flat="false"
+                # print("DEBUG: Found 'inventory' key. Content: {}".format(observations['inventory'])) # You can keep or remove this
+                for item_slot in observations["inventory"]:
+                    item_type = item_slot.get("type")
+                    inventory_source = item_slot.get("inventory")
+                    quantity = item_slot.get("quantity", 0)
+
+                    if inventory_source == "inventory" and item_type == item_name_to_find: # <--- THE FIX
+                        # print("DEBUG: MATCH! Adding {} of {} from player inventory.".format(quantity, item_name_to_find)) # Optional match print
+                        total_quantity += quantity
+            else:
+                # Fallback for flat=true format (though your log shows flat=false is working)
+                # print("DEBUG: 'inventory' key (for flat=false) NOT found. Checking for flat=true format...")
+                found_in_flat_format = False
+                for i in range(40): 
+                    item_key = "InventorySlot_{}_item".format(i)
+                    size_key = "InventorySlot_{}_size".format(i)
+                    if item_key in observations and observations[item_key] == item_name_to_find:
+                        current_quantity_str = observations.get(size_key, "0")
+                        try:
+                            current_quantity = int(current_quantity_str)
+                        except ValueError:
+                            # print("WARNING: Could not convert flat inventory size '{}' to int for slot {}.".format(current_quantity_str, i))
+                            current_quantity = 0
+                        total_quantity += current_quantity
+                        found_in_flat_format = True
+                
+                if not found_in_flat_format:
+                    available_keys = []
+                    if isinstance(observations, dict): 
+                        available_keys = list(observations.keys())
+                    # print("DEBUG: Item '{}' not found in any known inventory format. Available keys in observation: {}".format(item_name_to_find, available_keys))
+
+
+        except json.JSONDecodeError:
+            # print("ERROR: JSONDecodeError while parsing inventory: {}".format(msg))
+            return 0 
+        except Exception as e:
+            # print("ERROR: {} while processing inventory: {}".format(type(e).__name__, e))
+            return 0
+    # else:
+        # print("DEBUG: No new observations received for inventory check.")
+
+    # print("DEBUG: Final count for '{}': {}".format(item_name_to_find, total_quantity)) # You can keep or remove this
+    return total_quantity
+    
+    
+    
+    
+def get_ticks_since_mission_start(agent_host_instance):
+    """
+    Gets the number of game ticks the agent has been alive in the current mission.
+
+    Args:
+        agent_host_instance: The MalmoPython.AgentHost object.
+
+    Returns:
+        int: The value of "TimeAlive" from observations, or -1 if not found or error.
+    """
+    ticks_alive = -1
+    world_state = agent_host_instance.getWorldState()
+
+    if world_state.number_of_observations_since_last_state > 0:
+        msg = world_state.observations[-1].text
+        try:
+            observations = json.loads(msg)
+            if "TimeAlive" in observations:
+                ticks_alive = observations["TimeAlive"] 
+                # TimeAlive is usually an integer number of ticks.
+        except json.JSONDecodeError:
+            print("ERROR: JSONDecodeError while getting TimeAlive: {}".format(msg))
+            return -1 
+        except Exception as e:
+            print("ERROR: {} while getting TimeAlive: {}".format(type(e).__name__, e))
+            return -1
+    return ticks_alive
+
+
+def look_down_harvest_and_replant(agent_host):
+    """
+    Makes the agent look straight down, harvest the wheat, and replant seeds..
+    """
+    agent_host.sendCommand("attack 1")
+    time.sleep(0.01)
+    agent_host.sendCommand("attack 0")
+    time.sleep(0.1)
+    agent_host.sendCommand("use 1")
+    time.sleep(0.01)
+    agent_host.sendCommand("use 0")
