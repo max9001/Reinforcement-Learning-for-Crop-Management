@@ -213,12 +213,12 @@ print("\nMission started!")
 # ]
 
 q_agent = QLearningAgent(
-    actions_list=list(range(len(ACTIONS_LIST))), # Pass indices [0, 1, ..., 6]
-    alpha=0.1,      # Learning rate
-    gamma=0.9,      # Discount factor for future rewards
-    epsilon=1.0,    # Initial exploration rate (start high)
-    epsilon_decay=0.999, # Decay epsilon slowly
-    min_epsilon=0.05   # Minimum exploration rate
+    actions_list=list(range(len(ACTIONS_LIST))),
+    alpha=0.1,      
+    gamma=0.9,      
+    epsilon=1.0,    
+    epsilon_decay=0.99, # Changed from 0.999
+    min_epsilon=0.05   
 )
 
 # learning.py
