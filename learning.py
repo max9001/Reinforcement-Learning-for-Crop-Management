@@ -1,33 +1,66 @@
-# import sys
-# sys.path.append("/usr/local/lib/python3.5/dist-packages/malmo/") 
+# learning.py
 
-#--------------------------------------------------------------------------
-
-# import malmo.MalmoPython as MalmoPython # <<< IMPORTANT: Change to import MalmoPython if not using Docker
-
-import MalmoPython  # <<< IMPORTANT: Change to import MalmoPython if not using Docker
+import MalmoPython
 import os
-import sys # <<< IMPORTANT: Ensure this is imported
+import sys
 import random
 import time
 import json
-from qLearn_helper import *
+from qLearn_helper import (
+    get_inventory_item_count,
+    get_state_active_scan_5_points,
+    print_intuitive_state_5_points,
+    step,
+    teleport_agent,
+    VALID_FARM_COORDINATES, # Make sure these are imported or defined here
+    ACTIONS_LIST,
+    ACTION_NAMES
+)
 from q_agent import QLearningAgent
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # Ensure matplotlib is imported
 
-# <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
+# --- Class to Tee stdout to a file (as provided before) ---
+class Logger(object):
+    def __init__(self, filename="Default.log", mode="a", buff=1): # Changed buff to 1 for line buffering
+        self.stdout = sys.stdout
+        self.file = open(filename, mode, buffering=buff if sys.version_info[0] >=3 else buff) # Python 3+ uses buffering
+        self.filename = filename # Store filename for messages
 
-# <AgentQuitFromCollectingItem>
-#     <Item type="wheat" description="Success! Collected the wheat."/>
-# </AgentQuitFromCollectingItem>
+    def write(self, message):
+        self.stdout.write(message)
+        self.file.write(message)
+        # No explicit flush needed per write if line buffered, but can be added if issues.
 
+    def flush(self): # Keep flush method if manual flushing is desired
+        self.stdout.flush()
+        self.file.flush()
 
+    def close(self): 
+        if self.stdout is not None:
+            # Only restore if sys.stdout is still our logger instance
+            if sys.stdout == self: 
+                sys.stdout = self.stdout 
+            self.stdout = None # Break circular reference for original stdout
+        if self.file is not None:
+            self.file.close()
+            self.file = None
 
+    def __del__(self): 
+        self.close()
 
+# --- Main script execution block ---
+if __name__ == "__main__":
+    # --- Setup logging ---
+    log_filename = "mission_RL_output.log"
+    # Create a logger instance and redirect stdout
+    # IMPORTANT: Do this BEFORE any other print statements you want captured.
+    logger_instance = Logger(log_filename, mode="w") # 'w' to overwrite for each new run
+    sys.stdout = logger_instance
+    
+    print("--- Script Start ---")
+    print("Standard output is now being logged to: {}".format(log_filename))
 
-
-
-mission_xml = '''
+    mission_xml = '''
 <?xml version="1.0" encoding="UTF-8" ?>
 <Mission xmlns="http://ProjectMalmo.microsoft.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <About>
@@ -141,195 +174,201 @@ mission_xml = '''
 </Mission>
 '''
 
-# --- Agent Setup ---
-agent_host = MalmoPython.AgentHost()
-try:
-    agent_host.parse(sys.argv) # sys.argv needs 'import sys'
-except RuntimeError as e:
-    print('ERROR parsing arguments:', e)
-    print(agent_host.getUsage())
-    exit(1)
-if agent_host.receivedArgument("help"):
-    print(agent_host.getUsage())
-    exit(0)
-
-# --- Setup ClientPool ---
-# This is generally more robust for starting missions
-my_client_pool = MalmoPython.ClientPool()
-my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000)) # Default Malmo port
-
-my_mission = MalmoPython.MissionSpec(mission_xml, True)
-my_mission_record = MalmoPython.MissionRecordSpec()
-
-max_retries = 3
-for retry in range(max_retries):
+    agent_host = MalmoPython.AgentHost()
     try:
-        # Attempt to start the mission using the client pool:
-        # The last parameter (0) is the experiment_id, unique for each agent if running multiple.
-        # The last string ("Frank_experiment") is a unique role ID for this agent in this experiment.
-        agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_Wheat_Collector_Role")
-        break
+        agent_host.parse(sys.argv)
     except RuntimeError as e:
-        if retry == max_retries - 1:
-            print("Error starting mission:", e)
-            print("*********")
-            print("Most likely incorrect formatting in your XML section -Max")
-            print("*********")
-            exit(1)
-        else:
-            print("Retry starting mission in 2 seconds...")
-            time.sleep(2)
+        print('ERROR parsing arguments:', e)
+        print(agent_host.getUsage())
+        if isinstance(sys.stdout, Logger): sys.stdout.close() # Ensure log file is closed
+        exit(1)
+    if agent_host.receivedArgument("help"):
+        print(agent_host.getUsage())
+        if isinstance(sys.stdout, Logger): sys.stdout.close()
+        exit(0)
 
-print("Waiting for the mission to start", end=' ')
-world_state = agent_host.getWorldState()
-while not world_state.has_mission_begun:
-    print(".", end="")
-    time.sleep(0.1)
-    world_state = agent_host.getWorldState()
-    for error in world_state.errors: # Check for errors reported by Malmo
-        print("\nERROR during mission start:", error.text)
-        # If there are errors here, it often means an XML issue or client connection problem
-print("\nMission started!")
+    my_client_pool = MalmoPython.ClientPool()
+    my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000))
 
-# --- Agent Action Sequence ---
-# while agent_host.getWorldState().is_mission_running:
-#random_method(agent_host)       
+    my_mission = MalmoPython.MissionSpec(mission_xml, True)
+    my_mission_record = MalmoPython.MissionRecordSpec()
 
-    # iteration_method(agent_host)
-
-#wait_10mins_method(agent_host)
-
-# --- RL Setup ---
-# Define your action space (index to method)
-
-# ACTIONS = [
-#     "move_up",
-#     "move_down",
-#     "move_left",
-#     "move_right",
-#     "harvest",      # equals attack
-#     "plant",
-#     "wait"          # waiting for maturity
-# ]
-
-q_agent = QLearningAgent(
-    actions_list=list(range(len(ACTIONS_LIST))),
-    alpha=0.1,      
-    gamma=0.9,      
-    epsilon=1.0,    
-    epsilon_decay=0.99, # Changed from 0.999
-    min_epsilon=0.05   
-)
-
-# learning.py
-
-# ... (your imports and setup, agent_host, q_agent, etc.) ...
-# Ensure get_inventory_item_count is imported or defined
-# from qLearn_helper import get_inventory_item_count, ... (and other necessary functions)
-
-# --- RL Training Loop ---
-num_episodes = 1000
-max_steps_per_episode = 100
-
-episode_rewards = []
-episode_wheat_collected = [] # New list to track wheat collected per episode
-
-initial_farm_spots = list(VALID_FARM_COORDINATES) # Make sure VALID_FARM_COORDINATES is defined
-
-for episode in range(num_episodes):
-    # Reset agent to a random valid starting spot
-    start_x, start_z = random.choice(initial_farm_spots)
-    teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
-    time.sleep(0.2) 
-
-    current_x, current_z = start_x, start_z
-    current_cumulative_reward = 0
-    
-    # --- Track Wheat Collection ---
-    # Get wheat count at the START of the episode
-    # Ensure a fresh world state for this initial inventory check
-    time.sleep(0.1) # Allow observations to settle if needed
-    initial_wheat_count = get_inventory_item_count(agent_host, "wheat")
-    if initial_wheat_count < 0: # Handle potential error from get_inventory_item_count
-        print("WARNING: Error getting initial wheat count for episode {}. Setting to 0.".format(episode + 1))
-        initial_wheat_count = 0
-    
-    current_state = get_state_active_scan_5_points(agent_host, current_x, current_z)
-
-    # --- Obnoxious Start of Episode Separator ---
-    print("\n" + "=" * 70)
-    print("========== S T A R T   O F   E P I S O D E : {:>5} ==========".format(episode + 1))
-    print("=" * 70)
-    print("Initial position: ({}, {}), Initial wheat in inventory: {}".format(current_x, current_z, initial_wheat_count))
-    print_intuitive_state_5_points(current_state)
-    print("-" * 70) # Sub-separator
-
-    for step_num in range(max_steps_per_episode):
-        if not agent_host.getWorldState().is_mission_running:
-            print("Mission ended prematurely in episode {} at step {}.".format(episode + 1, step_num))
+    max_retries = 3
+    for retry in range(max_retries):
+        try:
+            agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
             break
+        except RuntimeError as e:
+            if retry == max_retries - 1:
+                print("Error starting mission:", e)
+                if isinstance(sys.stdout, Logger): sys.stdout.close()
+                exit(1)
+            else:
+                print("Retry starting mission in 2 seconds...")
+                time.sleep(2)
 
-        action_idx = q_agent.choose_action(current_state)
+    print("Waiting for the mission to start", end=' ')
+    world_state = agent_host.getWorldState()
+    while not world_state.has_mission_begun:
+        print(".", end="")
+        sys.stdout.flush() # Force console print
+        time.sleep(0.1)
+        world_state = agent_host.getWorldState()
+        for error in world_state.errors:
+            print("\nERROR during mission start:", error.text)
+    print("\nMission started!")
+
+    # --- RL Setup ---
+    q_agent = QLearningAgent(
+        actions_list=list(range(len(ACTIONS_LIST))),
+        alpha=0.1,      
+        gamma=0.9,      
+        epsilon=1.0,    
+        epsilon_decay=0.99, # A more reasonable decay
+        min_epsilon=0.05   
+    )
+
+    # --- RL Training Loop ---
+    num_episodes = 200  # Adjust as needed
+    max_steps_per_episode = 100 # Adjust as needed
+
+    episode_rewards = []
+    episode_wheat_collected = [] 
+
+    # Ensure VALID_FARM_COORDINATES is accessible (defined in qLearn_helper.py or here)
+    if not 'VALID_FARM_COORDINATES' in globals() and not 'VALID_FARM_COORDINATES' in locals():
+         print("ERROR: VALID_FARM_COORDINATES not defined/imported!")
+         # Define it here if it's not in qLearn_helper or qLearn_helper isn't fully imported
+         # For example:
+         # VALID_FARM_COORDINATES = set([(-3,-6), ...]) # Your full list
+         # For now, exiting if not found, assuming it's in qLearn_helper
+         if isinstance(sys.stdout, Logger): sys.stdout.close()
+         exit(1)
+
+    initial_farm_spots = list(VALID_FARM_COORDINATES) 
+
+    for episode in range(num_episodes):
+        start_x, start_z = random.choice(initial_farm_spots)
+        teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
+        time.sleep(0.2) 
+
+        current_x, current_z = start_x, start_z
+        current_cumulative_reward = 0
         
-        (next_x, next_z), reward = step(agent_host, action_idx, current_x, current_z, current_state)
-        current_cumulative_reward += reward
+        time.sleep(0.1) 
+        initial_wheat_count = get_inventory_item_count(agent_host, "wheat")
+        if initial_wheat_count < 0: 
+            print("WARNING: Error getting initial wheat count for episode {}. Setting to 0.".format(episode + 1))
+            initial_wheat_count = 0
         
-        next_state = get_state_active_scan_5_points(agent_host, next_x, next_z)
-        q_agent.learn(current_state, action_idx, reward, next_state)
+        current_state = get_state_active_scan_5_points(agent_host, current_x, current_z)
 
-        current_state = next_state
-        current_x, current_z = next_x, next_z
+        print("\n" + "=" * 70)
+        print("========== S T A R T   O F   E P I S O D E : {:>5} ==========".format(episode + 1))
+        print("=" * 70)
+        print("Initial position: ({}, {}), Initial wheat in inventory: {}".format(current_x, current_z, initial_wheat_count))
+        print_intuitive_state_5_points(current_state)
+        print("-" * 70) 
 
-        # The existing per-step print statement (can be commented out for less verbose output during long runs)
-        print("Ep {}, Step {}: Agent@({}, {}), Act:{}, Rew:{:.1f}, TotRew:{:.1f}, Eps:{:.3f}".format(
-            episode + 1, step_num + 1, current_x, current_z, ACTION_NAMES[action_idx], 
-            reward, current_cumulative_reward, q_agent.epsilon
-        ))
-        # if (step_num + 1) % 10 == 0: # Optional: print intuitive state every 10 steps
-            # print_intuitive_state_5_points(current_state)
+        for step_num in range(max_steps_per_episode):
+            world_state = agent_host.getWorldState() # Get fresh world state
+            if not world_state.is_mission_running:
+                print("Mission ended prematurely in episode {} at step {}.".format(episode + 1, step_num))
+                break
+            
+            # Check for Malmo errors during step
+            for error in world_state.errors:
+                print("MALMO RUNTIME ERROR: {}".format(error.text))
 
-        time.sleep(0.05) 
 
-    # --- End of Episode ---
-    episode_rewards.append(current_cumulative_reward)
-    q_agent.decay_epsilon()
+            action_idx = q_agent.choose_action(current_state)
+            
+            (next_x, next_z), reward = step(agent_host, action_idx, current_x, current_z, current_state)
+            current_cumulative_reward += reward
+            
+            # Small delay to allow observation to catch up with the action's effects
+            time.sleep(0.1) # THIS IS IMPORTANT, especially after an action modifying the world
+            
+            next_state = get_state_active_scan_5_points(agent_host, next_x, next_z)
+            q_agent.learn(current_state, action_idx, reward, next_state)
 
-    # Get wheat count at the END of the episode
-    final_wheat_count = get_inventory_item_count(agent_host, "wheat")
-    if final_wheat_count < 0: # Handle potential error
-        print("WARNING: Error getting final wheat count for episode {}. Assuming no change.".format(episode + 1))
-        final_wheat_count = initial_wheat_count # Or 0, depending on how you want to handle errors
+            current_state = next_state
+            current_x, current_z = next_x, next_z
+
+            print("Ep {}, St {}: @({}, {}), Act:{}, Rew:{:.1f}, TotRew:{:.1f}, Eps:{:.3f}".format(
+                episode + 1, step_num + 1, current_x, current_z, ACTION_NAMES.get(action_idx, "Unknown"), 
+                reward, current_cumulative_reward, q_agent.epsilon
+            ))
+            
+            # A very short sleep if MsPerTick is low, or longer if MsPerTick is high
+            # With MsPerTick=50, 0.05s is 2.5 ticks.
+            # With MsPerTick=3, 0.05s is ~16 ticks.
+            time.sleep(0.05)  # General loop delay
+
+        # --- End of Episode ---
+        episode_rewards.append(current_cumulative_reward)
+        q_agent.decay_epsilon()
+
+        final_wheat_count = get_inventory_item_count(agent_host, "wheat")
+        if final_wheat_count < 0: 
+            print("WARNING: Error getting final wheat count for episode {}. Assuming no change.".format(episode + 1))
+            final_wheat_count = initial_wheat_count 
+            
+        wheat_collected_this_episode = final_wheat_count - initial_wheat_count
+        episode_wheat_collected.append(wheat_collected_this_episode)
+
+        print("-" * 70)
+        print("*" * 70)
+        print("********** E N D   O F   E P I S O D E : {:>5} **********".format(episode + 1))
+        print("Total Reward for Episode: {:.2f}".format(current_cumulative_reward))
+        print("Wheat Collected This Episode: {}".format(wheat_collected_this_episode))
+        print("Total Wheat in Inventory: {}".format(final_wheat_count))
+        print("Current Epsilon: {:.4f}".format(q_agent.epsilon))
+        print("*" * 70)
+        sys.stdout.flush() # Ensure all episode summary is written to file
+
+    # --- End of Training ---
+    print("\n" + "#" * 70)
+    print("############ T R A I N I N G   C O M P L E T E ############")
+    print("#" * 70)
+
+    # Plotting
+    try:
+        plt.figure(figsize=(14, 6))
+        plt.subplot(1, 2, 1)
+        plt.plot(episode_rewards)
+        plt.title('Episode Rewards Over Time')
+        plt.xlabel('Episode')
+        plt.ylabel('Total Reward')
+        plt.grid(True)
+
+        plt.subplot(1, 2, 2)
+        plt.plot(episode_wheat_collected)
+        plt.title('Wheat Collected Per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Net Wheat Collected')
+        plt.grid(True)
         
-    wheat_collected_this_episode = final_wheat_count - initial_wheat_count
-    episode_wheat_collected.append(wheat_collected_this_episode)
+        plt.tight_layout()
+        plot_filename = "training_plots.png"
+        plt.savefig(plot_filename)
+        print("INFO: Plots saved to {}".format(plot_filename))
+        # plt.show() # This will block if run in a non-interactive environment
+    except ImportError:
+        print("WARNING: matplotlib not found. Cannot generate plots. Please install it (`pip install matplotlib`).")
+    except Exception as e:
+        print("ERROR: Could not generate plots - {}".format(e))
 
-    # --- Obnoxious End of Episode Separator and Info ---
-    print("-" * 70) # Sub-separator
-    print("*" * 70)
-    print("********** E N D   O F   E P I S O D E : {:>5} **********".format(episode + 1))
-    print("Total Reward for Episode: {:.2f}".format(current_cumulative_reward))
-    print("Wheat Collected This Episode: {}".format(wheat_collected_this_episode))
-    print("Total Wheat in Inventory: {}".format(final_wheat_count))
-    print("Current Epsilon: {:.4f}".format(q_agent.epsilon))
-    print("*" * 70)
 
-# ... (rest of your script, e.g., saving Q-table, plotting rewards) ...
+    if agent_host.getWorldState().is_mission_running:
+        print("INFO: Mission still running, sending quit command.")
+        agent_host.sendCommand("quit")
+        time.sleep(1) # Give time for quit to process
 
-# Example of plotting at the end (requires matplotlib)
-
-plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
-plt.plot(episode_rewards)
-plt.title('Episode Rewards')
-plt.xlabel('Episode')
-plt.ylabel('Total Reward')
-plt.subplot(1, 2, 2)
-plt.plot(episode_wheat_collected)
-plt.title('Wheat Collected Per Episode')
-plt.xlabel('Episode')
-plt.ylabel('Wheat Collected')
-plt.tight_layout()
-plt.show()
-
-if agent_host.getWorldState().is_mission_running:
-    agent_host.sendCommand("quit")
+    print("--- Script End ---")
+    
+    # Explicitly close the logger at the very end
+    # This also restores original stdout
+    if isinstance(sys.stdout, Logger):
+        print("INFO: Closing log file: {}".format(sys.stdout.filename))
+        sys.stdout.close()
