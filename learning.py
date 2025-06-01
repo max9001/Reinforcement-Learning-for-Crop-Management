@@ -17,7 +17,6 @@ from qLearn_helper import (
     ACTION_NAMES
 )
 from q_agent import QLearningAgent
-import matplotlib.pyplot as plt # Ensure matplotlib is imported
 
 # --- Class to Tee stdout to a file (as provided before) ---
 class Logger(object):
@@ -67,7 +66,7 @@ if __name__ == "__main__":
         <Summary>Frank's Test - Step 2</Summary>
     </About>
     <ModSettings>
-        <MsPerTick>3</MsPerTick>
+        <MsPerTick>1</MsPerTick>
     </ModSettings>
     <ServerSection>
         <ServerInitialConditions>
@@ -160,7 +159,7 @@ if __name__ == "__main__":
             <InventoryCommands />
             <AbsoluteMovementCommands/>
 
-            <AgentQuitFromTimeUp timeLimitMs="100000000" description="Mission Ended (Time Up)."/>
+            <AgentQuitFromTimeUp timeLimitMs="9999999999999999" description="Mission Ended (Time Up)."/>
             <ObservationFromGrid>
                 <Grid name="wheatField">
                     <min x="-3" y="225" z="-6"/>
@@ -221,16 +220,16 @@ if __name__ == "__main__":
     # --- RL Setup ---
     q_agent = QLearningAgent(
         actions_list=list(range(len(ACTIONS_LIST))),
-        alpha=0.1,      
-        gamma=0.9,      
+        alpha=0.05,      
+        gamma=0.95,      
         epsilon=1.0,    
-        epsilon_decay=0.99, # A more reasonable decay
+        epsilon_decay=0.995, # A more reasonable decay
         min_epsilon=0.05   
     )
 
     # --- RL Training Loop ---
-    num_episodes = 200  # Adjust as needed
-    max_steps_per_episode = 100 # Adjust as needed
+    num_episodes = 500  # Adjust as needed
+    max_steps_per_episode = 200 # Adjust as needed
 
     episode_rewards = []
     episode_wheat_collected = [] 
@@ -248,6 +247,32 @@ if __name__ == "__main__":
     initial_farm_spots = list(VALID_FARM_COORDINATES) 
 
     for episode in range(num_episodes):
+        # # Start a new mission for each episode
+        # for retry in range(max_retries):
+        #     try:
+        #         agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
+        #         break
+        #     except RuntimeError as e:
+        #         if retry == max_retries - 1:
+        #             print("Error starting mission:", e)
+        #             if isinstance(sys.stdout, Logger): sys.stdout.close()
+        #             exit(1)
+        #         else:
+        #             print("Retry starting mission in 2 seconds...")
+        #             time.sleep(2)
+
+        # print("Waiting for the mission to start", end=' ')
+        # world_state = agent_host.getWorldState()
+        # while not world_state.has_mission_begun:
+        #     print(".", end="")
+        #     sys.stdout.flush()
+        #     time.sleep(0.1)
+        #     world_state = agent_host.getWorldState()
+        #     for error in world_state.errors:
+        #         print("\nERROR during mission start:", error.text)
+        # print("\nMission started!")
+
+
         start_x, start_z = random.choice(initial_farm_spots)
         teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
         time.sleep(0.2) 
@@ -270,7 +295,10 @@ if __name__ == "__main__":
         print_intuitive_state_5_points(current_state)
         print("-" * 70) 
 
+
         for step_num in range(max_steps_per_episode):
+            agent_host.sendCommand("clearinventory")
+            time.sleep(0.1)
             world_state = agent_host.getWorldState() # Get fresh world state
             if not world_state.is_mission_running:
                 print("Mission ended prematurely in episode {} at step {}.".format(episode + 1, step_num))
@@ -310,22 +338,27 @@ if __name__ == "__main__":
         q_agent.decay_epsilon()
 
         final_wheat_count = get_inventory_item_count(agent_host, "wheat")
-        if final_wheat_count < 0: 
-            print("WARNING: Error getting final wheat count for episode {}. Assuming no change.".format(episode + 1))
-            final_wheat_count = initial_wheat_count 
+        # if final_wheat_count < 0: 
+        #     print("WARNING: Error getting final wheat count for episode {}. Assuming no change.".format(episode + 1))
+        #     final_wheat_count = initial_wheat_count 
             
-        wheat_collected_this_episode = final_wheat_count - initial_wheat_count
-        episode_wheat_collected.append(wheat_collected_this_episode)
+        # wheat_collected_this_episode = final_wheat_count - initial_wheat_count
+        # episode_wheat_collected.append(wheat_collected_this_episode)
+        episode_wheat_collected.append(final_wheat_count)
+
 
         print("-" * 70)
         print("*" * 70)
         print("********** E N D   O F   E P I S O D E : {:>5} **********".format(episode + 1))
         print("Total Reward for Episode: {:.2f}".format(current_cumulative_reward))
-        print("Wheat Collected This Episode: {}".format(wheat_collected_this_episode))
+        # print("Wheat Collected This Episode: {}".format(wheat_collected_this_episode))
         print("Total Wheat in Inventory: {}".format(final_wheat_count))
         print("Current Epsilon: {:.4f}".format(q_agent.epsilon))
         print("*" * 70)
         sys.stdout.flush() # Ensure all episode summary is written to file
+
+        agent_host.sendCommand("clearinventory") 
+        agent_host.sendCommand("give wheat_seeds 64")      
 
     # --- End of Training ---
     print("\n" + "#" * 70)
@@ -333,32 +366,37 @@ if __name__ == "__main__":
     print("#" * 70)
 
     # Plotting
-    try:
-        plt.figure(figsize=(14, 6))
-        plt.subplot(1, 2, 1)
-        plt.plot(episode_rewards)
-        plt.title('Episode Rewards Over Time')
-        plt.xlabel('Episode')
-        plt.ylabel('Total Reward')
-        plt.grid(True)
+    # try:
+    #     plt.figure(figsize=(14, 6))
+    #     plt.subplot(1, 2, 1)
+    #     plt.plot(episode_rewards)
+    #     plt.title('Episode Rewards Over Time')
+    #     plt.xlabel('Episode')
+    #     plt.ylabel('Total Reward')
+    #     plt.grid(True)
 
-        plt.subplot(1, 2, 2)
-        plt.plot(episode_wheat_collected)
-        plt.title('Wheat Collected Per Episode')
-        plt.xlabel('Episode')
-        plt.ylabel('Net Wheat Collected')
-        plt.grid(True)
+    #     plt.subplot(1, 2, 2)
+    #     plt.plot(episode_wheat_collected)
+    #     plt.title('Wheat Collected Per Episode')
+    #     plt.xlabel('Episode')
+    #     plt.ylabel('Net Wheat Collected')
+    #     plt.grid(True)
         
-        plt.tight_layout()
-        plot_filename = "training_plots.png"
-        plt.savefig(plot_filename)
-        print("INFO: Plots saved to {}".format(plot_filename))
-        # plt.show() # This will block if run in a non-interactive environment
-    except ImportError:
-        print("WARNING: matplotlib not found. Cannot generate plots. Please install it (`pip install matplotlib`).")
-    except Exception as e:
-        print("ERROR: Could not generate plots - {}".format(e))
+    #     plt.tight_layout()
+    #     plot_filename = "training_plots.png"
+    #     plt.savefig(plot_filename)
+    #     print("INFO: Plots saved to {}".format(plot_filename))
+    #     # plt.show() # This will block if run in a non-interactive environment
+    # except ImportError:
+    #     print("WARNING: matplotlib not found. Cannot generate plots. Please install it (`pip install matplotlib`).")
+    # except Exception as e:
+    #     print("ERROR: Could not generate plots - {}".format(e))
+    # Print episode rewards and wheat collected as comma-separated lists for external plotting
+    print("\nEpisode Rewards (comma-separated):")
+    print(','.join(str(r) for r in episode_rewards))
 
+    print("\nWheat Collected Per Episode (comma-separated):")
+    print(','.join(str(w) for w in episode_wheat_collected))
 
     if agent_host.getWorldState().is_mission_running:
         print("INFO: Mission still running, sending quit command.")
