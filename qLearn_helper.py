@@ -366,13 +366,19 @@ def perform_plant_sequence(agent_host_instance):
     time.sleep(0.1)
 
 
-def step(agent_host_instance, action_index, current_x, current_z, current_state_tuple): # Added agent_host_instance
-    """
-    Executes an action, calculates reward, and determines next position.
-    """
-    # global agent_host # REMOVE THIS LINE
+# Define the step penalty
+STEP_PENALTY = 0.1 # You can tune this value
 
-    reward = 0
+# ... (perform_harvest_sequence, perform_plant_sequence functions as before) ...
+
+def step(agent_host_instance, action_index, current_x, current_z, current_state_tuple):
+    """
+    Executes an action, calculates reward (including a step penalty), 
+    and determines next position.
+    """
+    # global agent_host # Not needed if agent_host_instance is passed
+    
+    base_reward_for_action = 0 # Reward specific to the outcome of the chosen action
     next_x, next_z = current_x, current_z
     age_at_current_spot = current_state_tuple[6] 
 
@@ -389,39 +395,44 @@ def step(agent_host_instance, action_index, current_x, current_z, current_state_
         
         if age_at_dest != ILLEGAL_COORD_MARKER:
             next_x, next_z = potential_next_x, potential_next_z
-            # Pass agent_host_instance to teleport_agent
-            teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5) 
+            teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5)
+            # No specific positive/negative reward for valid movement itself yet
         else:
-            reward = -0.5 
-            # ...
+            base_reward_for_action = -0.5 # Penalty for trying to move out of bounds (on top of step penalty)
+            # next_x, next_z remain current_x, current_z
+            # print("INFO: Agent tried to move to illegal spot...")
+            
     elif action_index == ACTION_HARVEST_CURRENT:
         if age_at_current_spot == 7:
-            reward = 10.0
+            base_reward_for_action = 10.0  
             print("INFO: Action Harvest - Harvested mature wheat! (age {})".format(age_at_current_spot))
-            perform_harvest_sequence(agent_host_instance) # Pass agent_host_instance
+            perform_harvest_sequence(agent_host_instance)
         elif age_at_current_spot >= 0 and age_at_current_spot < 7:
-            reward = -5.0
+            base_reward_for_action = -5.0 
             print("INFO: Action Harvest - Penalized for breaking immature wheat (age {}).".format(age_at_current_spot))
-            perform_harvest_sequence(agent_host_instance) # Pass agent_host_instance
+            perform_harvest_sequence(agent_host_instance)
         else: 
-            reward = -1.0
+            base_reward_for_action = -1.0 
             print("INFO: Action Harvest - Tried to harvest empty spot (age {}).".format(age_at_current_spot))
+
     elif action_index == ACTION_PLANT_CURRENT:
-        if age_at_current_spot == -1:
-            reward = 5.0
+        if age_at_current_spot == -1: 
+            base_reward_for_action = 5.0 
             print("INFO: Action Plant - Planted seed on empty spot.")
-            perform_plant_sequence(agent_host_instance) # Pass agent_host_instance
+            perform_plant_sequence(agent_host_instance)
         else: 
-            reward = -1.0
+            base_reward_for_action = -1.0 
             print("INFO: Action Plant - Tried to plant on non-empty/unsuitable spot (age {}).".format(age_at_current_spot))
+
     elif action_index == ACTION_WAIT:
         time.sleep(0.5) 
         print("INFO: Action Wait.")
+        # No specific base_reward_for_action for waiting, so it will just incur the STEP_PENALTY
 
-    return (next_x, next_z), reward
+    # Apply the constant step penalty to the action's base reward
+    final_reward = base_reward_for_action - STEP_PENALTY
 
-
-
+    return (next_x, next_z), final_reward
 
 def get_inventory_item_count(agent_host_instance, item_name_to_find):
     """
