@@ -280,7 +280,7 @@ if __name__ == "__main__":
             print("WARNING: Error getting initial wheat count for episode {}. Setting to 0.".format(episode + 1))
             initial_wheat_count = 0
         
-        current_state = get_state_active_scan_5_points(agent_host, current_x, current_z)
+        current_state = get_simple_state(agent_host, current_x, current_z)
 
         print("\n" + "=" * 70)
         print("========== S T A R T   O F   E P I S O D E : {:>5} ==========".format(episode + 1))
@@ -309,7 +309,7 @@ if __name__ == "__main__":
             # Small delay to allow observation to catch up with the action's effects
             time.sleep(0.1) # THIS IS IMPORTANT, especially after an action modifying the world
             
-            next_state = get_state_active_scan_5_points(agent_host, next_x, next_z)
+            next_state = get_simple_state(agent_host, next_x, next_z)
             q_agent.learn(current_state, action_idx, reward, next_state)
 
             current_state = next_state

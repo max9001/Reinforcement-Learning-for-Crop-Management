@@ -371,26 +371,27 @@ def step(agent_host_instance, action_index, current_x, current_z, current_state_
                 next_x, next_z = nx, nz
                 teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5)
                 break
+            reward = -2  # Penalize for invalid move
             print("INFO: Action Move - Invalid move to ({}, {}).".format(nx, nz))
     elif action_index == ACTION_HARVEST:
         if age_at_current_spot == 7:
-            reward = 50
+            reward = 10
             print("INFO: Action Harvest - Harvested mature wheat! (age {})".format(age_at_current_spot))
             perform_harvest_sequence(agent_host_instance) # Pass agent_host_instance
         elif age_at_current_spot >= 0 and age_at_current_spot < 7:
-            reward = -40
+            reward = -5
             print("INFO: Action Harvest - Penalized for breaking immature wheat (age {}).".format(age_at_current_spot))
             perform_harvest_sequence(agent_host_instance) # Pass agent_host_instance
         else: 
-            reward = -20
+            reward = -1
             print("INFO: Action Harvest - Tried to harvest empty spot (age {}).".format(age_at_current_spot))
     elif action_index == ACTION_PLANT:
         if age_at_current_spot == -1:
-            reward = 50
+            reward = 5
             print("INFO: Action Plant - Planted seed on empty spot.")
             perform_plant_sequence(agent_host_instance) # Pass agent_host_instance
         else: 
-            reward = -20
+            reward = -1
             print("INFO: Action Plant - Tried to plant on non-empty/unsuitable spot (age {}).".format(age_at_current_spot))
 
     return (next_x, next_z), reward
