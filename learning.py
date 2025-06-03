@@ -6,16 +6,7 @@ import sys
 import random
 import time
 import json
-from qLearn_helper import (
-    get_inventory_item_count,
-    get_state_active_scan_5_points,
-    print_intuitive_state_5_points,
-    step,
-    teleport_agent,
-    VALID_FARM_COORDINATES, # Make sure these are imported or defined here
-    ACTIONS_LIST,
-    ACTION_NAMES
-)
+from qLearn_helper import *
 from q_agent import QLearningAgent
 
 # --- Class to Tee stdout to a file (as provided before) ---
@@ -189,33 +180,33 @@ if __name__ == "__main__":
     my_client_pool = MalmoPython.ClientPool()
     my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000))
 
-    my_mission = MalmoPython.MissionSpec(mission_xml, True)
-    my_mission_record = MalmoPython.MissionRecordSpec()
+    # my_mission = MalmoPython.MissionSpec(mission_xml, True)
+    # my_mission_record = MalmoPython.MissionRecordSpec()
 
     max_retries = 3
-    for retry in range(max_retries):
-        try:
-            agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
-            break
-        except RuntimeError as e:
-            if retry == max_retries - 1:
-                print("Error starting mission:", e)
-                if isinstance(sys.stdout, Logger): sys.stdout.close()
-                exit(1)
-            else:
-                print("Retry starting mission in 2 seconds...")
-                time.sleep(2)
+    # for retry in range(max_retries):
+    #     try:
+    #         agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
+    #         break
+    #     except RuntimeError as e:
+    #         if retry == max_retries - 1:
+    #             print("Error starting mission:", e)
+    #             if isinstance(sys.stdout, Logger): sys.stdout.close()
+    #             exit(1)
+    #         else:
+    #             print("Retry starting mission in 2 seconds...")
+    #             time.sleep(2)
 
-    print("Waiting for the mission to start", end=' ')
-    world_state = agent_host.getWorldState()
-    while not world_state.has_mission_begun:
-        print(".", end="")
-        sys.stdout.flush() # Force console print
-        time.sleep(0.1)
-        world_state = agent_host.getWorldState()
-        for error in world_state.errors:
-            print("\nERROR during mission start:", error.text)
-    print("\nMission started!")
+    # print("Waiting for the mission to start", end=' ')
+    # world_state = agent_host.getWorldState()
+    # while not world_state.has_mission_begun:
+    #     print(".", end="")
+    #     sys.stdout.flush() # Force console print
+    #     time.sleep(0.1)
+    #     world_state = agent_host.getWorldState()
+    #     for error in world_state.errors:
+    #         print("\nERROR during mission start:", error.text)
+    # print("\nMission started!")
 
     # --- RL Setup ---
     q_agent = QLearningAgent(
@@ -229,7 +220,7 @@ if __name__ == "__main__":
 
     # --- RL Training Loop ---
     num_episodes = 500  # Adjust as needed
-    max_steps_per_episode = 200 # Adjust as needed
+    max_steps_per_episode = 50 # Adjust as needed
 
     episode_rewards = []
     episode_wheat_collected = [] 
@@ -247,30 +238,32 @@ if __name__ == "__main__":
     initial_farm_spots = list(VALID_FARM_COORDINATES) 
 
     for episode in range(num_episodes):
-        # # Start a new mission for each episode
-        # for retry in range(max_retries):
-        #     try:
-        #         agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
-        #         break
-        #     except RuntimeError as e:
-        #         if retry == max_retries - 1:
-        #             print("Error starting mission:", e)
-        #             if isinstance(sys.stdout, Logger): sys.stdout.close()
-        #             exit(1)
-        #         else:
-        #             print("Retry starting mission in 2 seconds...")
-        #             time.sleep(2)
+        # Start a new mission for each episode
+        my_mission = MalmoPython.MissionSpec(mission_xml, True)
+        my_mission_record = MalmoPython.MissionRecordSpec()
+        for retry in range(max_retries):
+            try:
+                agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
+                break
+            except RuntimeError as e:
+                if retry == max_retries - 1:
+                    print("Error starting mission:", e)
+                    if isinstance(sys.stdout, Logger): sys.stdout.close()
+                    exit(1)
+                else:
+                    print("Retry starting mission in 2 seconds...")
+                    time.sleep(2)
 
-        # print("Waiting for the mission to start", end=' ')
-        # world_state = agent_host.getWorldState()
-        # while not world_state.has_mission_begun:
-        #     print(".", end="")
-        #     sys.stdout.flush()
-        #     time.sleep(0.1)
-        #     world_state = agent_host.getWorldState()
-        #     for error in world_state.errors:
-        #         print("\nERROR during mission start:", error.text)
-        # print("\nMission started!")
+        print("Waiting for the mission to start", end=' ')
+        world_state = agent_host.getWorldState()
+        while not world_state.has_mission_begun:
+            print(".", end="")
+            sys.stdout.flush()
+            time.sleep(0.1)
+            world_state = agent_host.getWorldState()
+            for error in world_state.errors:
+                print("\nERROR during mission start:", error.text)
+        print("\nMission started!")
 
 
         start_x, start_z = random.choice(initial_farm_spots)
@@ -297,8 +290,6 @@ if __name__ == "__main__":
 
 
         for step_num in range(max_steps_per_episode):
-            agent_host.sendCommand("clearinventory")
-            time.sleep(0.1)
             world_state = agent_host.getWorldState() # Get fresh world state
             if not world_state.is_mission_running:
                 print("Mission ended prematurely in episode {} at step {}.".format(episode + 1, step_num))
@@ -357,8 +348,17 @@ if __name__ == "__main__":
         print("*" * 70)
         sys.stdout.flush() # Ensure all episode summary is written to file
 
-        agent_host.sendCommand("clearinventory") 
-        agent_host.sendCommand("give wheat_seeds 64")      
+        if agent_host.getWorldState().is_mission_running:
+            print("INFO: Mission still running, sending quit command.")
+            agent_host.sendCommand("quit")
+            # Wait for mission to end, but don't wait forever
+            timeout = 10  # seconds
+            start_time = time.time()
+            while agent_host.getWorldState().is_mission_running:
+                if time.time() - start_time > timeout:
+                    print("WARNING: Mission did not end after quit command. Forcing break.")
+                    break
+                time.sleep(0.1)
 
     # --- End of Training ---
     print("\n" + "#" * 70)

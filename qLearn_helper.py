@@ -14,32 +14,16 @@ VALID_FARM_COORDINATES = set([
     (3, -6),  (3, -5),  (3, -4),  (3, -3),  (3, -2),  (3, -1),  (3, 0),
 ])
 # ACTIONS for the Q-Learning Agent
-ACTION_MOVE_N = 0
-ACTION_MOVE_E = 1
-ACTION_MOVE_S = 2
-ACTION_MOVE_W = 3
-ACTION_HARVEST_CURRENT = 4 # Just attempt to harvest (attack) current spot
-ACTION_PLANT_CURRENT = 5   # Attempt to plant on current spot (if empty)
-ACTION_WAIT = 6            # Do nothing for a short period
+ACTION_MOVE = 0
+ACTION_HARVEST = 1
+ACTION_PLANT = 2
 
-ACTIONS_LIST = [
-    ACTION_MOVE_N,
-    ACTION_MOVE_E,
-    ACTION_MOVE_S,
-    ACTION_MOVE_W,
-    ACTION_HARVEST_CURRENT, # Changed from HARVEST_PLANT_CURRENT
-    ACTION_PLANT_CURRENT,
-    ACTION_WAIT
-]
+ACTIONS_LIST = [ACTION_MOVE, ACTION_HARVEST, ACTION_PLANT]
 
-ACTION_NAMES = { # For printing/logging
-    ACTION_MOVE_N: "Move_N",
-    ACTION_MOVE_E: "Move_E",
-    ACTION_MOVE_S: "Move_S",
-    ACTION_MOVE_W: "Move_W",
-    ACTION_HARVEST_CURRENT: "Harvest", # Changed name
-    ACTION_PLANT_CURRENT: "Plant",
-    ACTION_WAIT: "Wait"
+ACTION_NAMES = {
+    ACTION_MOVE: "Move",
+    ACTION_HARVEST: "Harvest",
+    ACTION_PLANT: "Plant"
 }
 
 
@@ -374,27 +358,21 @@ def step(agent_host_instance, action_index, current_x, current_z, current_state_
 
     reward = 0
     next_x, next_z = current_x, current_z
-    age_at_current_spot = current_state_tuple[6] 
+    age_at_current_spot = current_state_tuple[2] 
 
-    move_deltas = {
-        ACTION_MOVE_N: (0, -1, current_state_tuple[2]),
-        ACTION_MOVE_E: (1, 0, current_state_tuple[3]),
-        ACTION_MOVE_S: (0, 1, current_state_tuple[4]),
-        ACTION_MOVE_W: (-1, 0, current_state_tuple[5])
-    }
 
-    if action_index in move_deltas:
-        dx, dz, age_at_dest = move_deltas[action_index]
-        potential_next_x, potential_next_z = current_x + dx, current_z + dz
-        
-        if age_at_dest != ILLEGAL_COORD_MARKER:
-            next_x, next_z = potential_next_x, potential_next_z
-            # Pass agent_host_instance to teleport_agent
-            teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5) 
-        else:
-            reward = -20 # Penalize for trying to move to an illegal coordinate
-            # ...
-    elif action_index == ACTION_HARVEST_CURRENT:
+    if action_index == ACTION_MOVE:
+        # Randomly pick a valid direction
+        possible_moves = [ (0, -1), (1, 0), (0, 1), (-1, 0) ]
+        random.shuffle(possible_moves)
+        for dx, dz in possible_moves:
+            nx, nz = current_x + dx, current_z + dz
+            if (nx, nz) in VALID_FARM_COORDINATES:
+                next_x, next_z = nx, nz
+                teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5)
+                break
+            print("INFO: Action Move - Invalid move to ({}, {}).".format(nx, nz))
+    elif action_index == ACTION_HARVEST:
         if age_at_current_spot == 7:
             reward = 50
             print("INFO: Action Harvest - Harvested mature wheat! (age {})".format(age_at_current_spot))
@@ -406,7 +384,7 @@ def step(agent_host_instance, action_index, current_x, current_z, current_state_
         else: 
             reward = -20
             print("INFO: Action Harvest - Tried to harvest empty spot (age {}).".format(age_at_current_spot))
-    elif action_index == ACTION_PLANT_CURRENT:
+    elif action_index == ACTION_PLANT:
         if age_at_current_spot == -1:
             reward = 50
             print("INFO: Action Plant - Planted seed on empty spot.")
@@ -414,10 +392,6 @@ def step(agent_host_instance, action_index, current_x, current_z, current_state_
         else: 
             reward = -20
             print("INFO: Action Plant - Tried to plant on non-empty/unsuitable spot (age {}).".format(age_at_current_spot))
-    elif action_index == ACTION_WAIT:
-        time.sleep(0.5)
-        reward = -20
-        print("INFO: Action Wait.")
 
     return (next_x, next_z), reward
 
@@ -484,3 +458,8 @@ def get_inventory_item_count(agent_host_instance, item_name_to_find):
 
     # print("DEBUG: Final count for '{}': {}".format(item_name_to_find, total_quantity)) # You can keep or remove this
     return total_quantity
+
+# Instead of get_state_active_scan_5_points, use:
+def get_simple_state(agent_host, x, z):
+    age = get_wheat_age_in_los(agent_host)
+    return (age,)
