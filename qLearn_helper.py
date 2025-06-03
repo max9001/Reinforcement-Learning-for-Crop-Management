@@ -494,3 +494,33 @@ def get_inventory_item_count(agent_host_instance, item_name_to_find):
 
     # print("DEBUG: Final count for '{}': {}".format(item_name_to_find, total_quantity)) # You can keep or remove this
     return total_quantity
+
+
+
+def get_ticks_since_mission_start(agent_host_instance):
+    """
+    Gets the number of game ticks the agent has been alive in the current mission.
+
+    Args:
+        agent_host_instance: The MalmoPython.AgentHost object.
+
+    Returns:
+        int: The value of "TimeAlive" from observations, or -1 if not found or error.
+    """
+    ticks_alive = -1
+    world_state = agent_host_instance.getWorldState()
+
+    if world_state.number_of_observations_since_last_state > 0:
+        msg = world_state.observations[-1].text
+        try:
+            observations = json.loads(msg)
+            if "TimeAlive" in observations:
+                ticks_alive = observations["TimeAlive"] 
+                # TimeAlive is usually an integer number of ticks.
+        except json.JSONDecodeError:
+            print("ERROR: JSONDecodeError while getting TimeAlive: {}".format(msg))
+            return -1 
+        except Exception as e:
+            print("ERROR: {} while getting TimeAlive: {}".format(type(e).__name__, e))
+            return -1
+    return ticks_alive

@@ -12,6 +12,7 @@ from qLearn_helper import (
     print_intuitive_state_5_points,
     step,
     teleport_agent,
+    get_ticks_since_mission_start,
     VALID_FARM_COORDINATES, # Make sure these are imported or defined here
     ACTIONS_LIST,
     ACTION_NAMES
@@ -181,14 +182,11 @@ if __name__ == "__main__":
             </ObservationFromGrid>
             <ObservationFromRay />
             <ObservationFromFullInventory/>
+            <ObservationFromFullStats />
         </AgentHandlers>
     </AgentSection>
 </Mission>
-'''
-
-
-
-    
+'''    
     agent_host = MalmoPython.AgentHost()
     # ... (agent_host.parse, client_pool, mission_spec setup) ...
     try:
@@ -211,7 +209,7 @@ if __name__ == "__main__":
     q_agent = QLearningAgent(
         actions_list=list(range(len(ACTIONS_LIST))), 
         alpha=0.1, gamma=0.9, epsilon=1.0, 
-        epsilon_decay=0.999, min_epsilon=0.05   
+        epsilon_decay=0.98, min_epsilon=0.05   
     )
 
     # Load existing training state (Q-table, epsilon, histories)
@@ -236,7 +234,7 @@ if __name__ == "__main__":
 
     # --- RL Training Loop ---
     # num_episodes_this_session is how many MORE episodes to run in THIS session
-    num_episodes_this_session = 1000  
+    num_episodes_this_session = 150  
     total_episodes_target = start_episode_num + num_episodes_this_session 
     max_steps_per_episode = 100 
 
@@ -244,6 +242,8 @@ if __name__ == "__main__":
          print("ERROR: VALID_FARM_COORDINATES not defined/imported!")
          if isinstance(sys.stdout, Logger): sys.stdout.close(); exit(1)
     initial_farm_spots = list(VALID_FARM_COORDINATES) 
+
+    start_time = 0
 
     try: 
         # Loop from the loaded start_episode_num up to the new target
@@ -272,7 +272,21 @@ if __name__ == "__main__":
             print("Initial position: ({}, {}), Initial wheat in inventory: {}".format(current_x, current_z, initial_wheat_count))
             print("Current Epsilon (start of ep): {:.4f}".format(q_agent.epsilon))
             print_intuitive_state_5_points(current_state)
-            print("-" * 70) 
+            
+            # time.sleep(0.5)  
+            # # print("-" * 70) 
+            # ticks = get_ticks_since_mission_start(agent_host)
+            # ticks = ticks - start_time
+            # print()
+            # print("episode length: ")
+            # print(ticks)
+            # print()
+            # time.sleep(0.5) 
+            # start_time = get_ticks_since_mission_start(agent_host)
+            # print("start time:")
+            # print(start_time)
+            # print()
+            # time.sleep(0.5) 
 
             for step_num in range(max_steps_per_episode):
                 # ... (step execution logic as before) ...
@@ -365,4 +379,5 @@ if __name__ == "__main__":
         print("--- Script End ---")
         if isinstance(sys.stdout, Logger):
             print("INFO: Closing log file: {}".format(sys.stdout.filename))
+
             sys.stdout.close()

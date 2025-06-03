@@ -9,8 +9,8 @@ import sys # <<< IMPORTANT: Ensure this is imported
 import random
 import time
 import json
-from benchmark.helper import *
-from q_agent import QLearningAgent
+from helper import *
+# from q_agent import QLearningAgent
 
 # <InventoryItem slot="0" type="dye" quantity="64" colour="WHITE"/>
 
@@ -192,59 +192,49 @@ print("\nMission started!")
 
 # --- RL Setup ---
 # Define your action space (index to method)
-methods = [wait_10mins_method, iteration_method, random_method]
-method_names = ["wait_10mins", "iteration", "random"]
+# methods = [wait_10mins_method, iteration_method, random_method]
+# method_names = ["wait_10mins", "iteration", "random"]
 
 
 
-# --- RL Training Loop ---
+# # --- RL Training Loop ---
 
-num_episodes = 10  # Increase for real training
-max_steps_per_episode = 1  # Each episode: pick one method
+# num_episodes = 10  # Increase for real training
+# max_steps_per_episode = 1  # Each episode: pick one method
 
-agent = QLearningAgent(
-    actions=[0, 1, 2],  # 0: wait_10mins, 1: iteration, 2: random
-    alpha=0.1,
-    gamma=0.9,
-    epsilon=0.2
-)
+# agent = QLearningAgent(
+#     actions=[0, 1, 2],  # 0: wait_10mins, 1: iteration, 2: random
+#     alpha=0.1,
+#     gamma=0.9,
+#     epsilon=0.2
+# )
 
-for episode in range(num_episodes):
-    print("\n=== Episode {} ===".format(episode + 1))
-    # Reset mission if needed (not shown here)
-    # Wait for mission to start, etc.
+# for episode in range(num_episodes):
+#     print("\n=== Episode {} ===".format(episode + 1))
+#     # Reset mission if needed (not shown here)
+#     # Wait for mission to start, etc.
 
-    # Get initial state
-    state = get_state(agent_host)
-    wheat_before = get_wheat_count(agent_host)
+#     # Get initial state
+#     state = get_state(agent_host)
+#     wheat_before = get_wheat_count(agent_host)
 
-    # Choose action (method)
-    action = agent.choose_action(state)
-    print("Chosen method: {}".format(method_names[int(action)]))
+#     # Choose action (method)
+#     action = agent.choose_action(state)
+#     print("Chosen method: {}".format(method_names[int(action)]))
 
-    # Run the chosen method
-    methods[action](agent_host)
+#     # Run the chosen method
+#     methods[action](agent_host)
 
-    # Get new state and reward
-    next_state = get_state(agent_host)
-    wheat_after = get_wheat_count(agent_host)
-    reward = wheat_after - wheat_before  # Reward: wheat collected
+#     # Get new state and reward
+#     next_state = get_state(agent_host)
+#     wheat_after = get_wheat_count(agent_host)
+#     reward = wheat_after - wheat_before  # Reward: wheat collected
 
-    print("Reward: {reward}".format(reward=reward))
+#     print("Reward: {reward}".format(reward=reward))
 
-    # Q-learning update
-    agent.learn(state, action, reward, next_state)
+#     # Q-learning update
+#     agent.learn(state, action, reward, next_state)
 
-
-print("\nTraining complete.")
-
-print()
-print("Mission ended")
-# Mission has ended.
-
-
-
-"""
 agent_host.sendCommand("setPitch 90")
 time.sleep(0.01)
 
@@ -274,9 +264,8 @@ while agent_host.getWorldState().is_mission_running:
 #         time.sleep(0.2) 
 #         current_x, current_z = perform_random_teleport_step(agent_host, current_x, current_z)        
 
-    time.sleep(59)
+    time.sleep(5)
     
-    iterate_through_farm(agent_host)
     
 #     if (print_counter % 40 == 0):
     time.sleep(0.5)  
@@ -287,4 +276,16 @@ while agent_host.getWorldState().is_mission_running:
     print("({}, {})".format(ticks, wheats))
         
     time.sleep(0.5)  
+
+
+print("\nTraining complete.")
+
+print()
+print("Mission ended")
+# Mission has ended.
+
+
+
+"""
+
 """
