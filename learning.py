@@ -149,6 +149,7 @@ if __name__ == "__main__":
             <DiscreteMovementCommands />
             <InventoryCommands />
             <AbsoluteMovementCommands/>
+            <ChatCommands/>
 
             <AgentQuitFromTimeUp timeLimitMs="9999999999999999" description="Mission Ended (Time Up)."/>
             <ObservationFromGrid>
@@ -220,7 +221,7 @@ if __name__ == "__main__":
 
     # --- RL Training Loop ---
     num_episodes = 500  # Adjust as needed
-    max_steps_per_episode = 50 # Adjust as needed
+    max_steps_per_episode = 100 # Adjust as needed
 
     episode_rewards = []
     episode_wheat_collected = [] 
@@ -348,17 +349,8 @@ if __name__ == "__main__":
         print("*" * 70)
         sys.stdout.flush() # Ensure all episode summary is written to file
 
-        if agent_host.getWorldState().is_mission_running:
-            print("INFO: Mission still running, sending quit command.")
-            agent_host.sendCommand("quit")
-            # Wait for mission to end, but don't wait forever
-            timeout = 10  # seconds
-            start_time = time.time()
-            while agent_host.getWorldState().is_mission_running:
-                if time.time() - start_time > timeout:
-                    print("WARNING: Mission did not end after quit command. Forcing break.")
-                    break
-                time.sleep(0.1)
+        agent_host.sendCommand("chat /clear Frank wheat") 
+        agent_host.sendCommand("give wheat_seeds 64")      
 
     # --- End of Training ---
     print("\n" + "#" * 70)
