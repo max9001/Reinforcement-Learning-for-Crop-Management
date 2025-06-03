@@ -158,6 +158,7 @@ if __name__ == "__main__":
             <DiscreteMovementCommands />
             <InventoryCommands />
             <AbsoluteMovementCommands/>
+            <ChatCommands/>
 
             <AgentQuitFromTimeUp timeLimitMs="9999999999999999" description="Mission Ended (Time Up)."/>
             <ObservationFromGrid>
@@ -229,7 +230,7 @@ if __name__ == "__main__":
 
     # --- RL Training Loop ---
     num_episodes = 500  # Adjust as needed
-    max_steps_per_episode = 200 # Adjust as needed
+    max_steps_per_episode = 100 # Adjust as needed
 
     episode_rewards = []
     episode_wheat_collected = [] 
@@ -357,7 +358,7 @@ if __name__ == "__main__":
         print("*" * 70)
         sys.stdout.flush() # Ensure all episode summary is written to file
 
-        agent_host.sendCommand("clearinventory") 
+        agent_host.sendCommand("chat /clear Frank wheat") 
         agent_host.sendCommand("give wheat_seeds 64")      
 
     # --- End of Training ---
