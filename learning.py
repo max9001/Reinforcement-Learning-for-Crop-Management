@@ -181,33 +181,33 @@ if __name__ == "__main__":
     my_client_pool = MalmoPython.ClientPool()
     my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000))
 
-    # my_mission = MalmoPython.MissionSpec(mission_xml, True)
-    # my_mission_record = MalmoPython.MissionRecordSpec()
+    my_mission = MalmoPython.MissionSpec(mission_xml, True)
+    my_mission_record = MalmoPython.MissionRecordSpec()
 
     max_retries = 3
-    # for retry in range(max_retries):
-    #     try:
-    #         agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
-    #         break
-    #     except RuntimeError as e:
-    #         if retry == max_retries - 1:
-    #             print("Error starting mission:", e)
-    #             if isinstance(sys.stdout, Logger): sys.stdout.close()
-    #             exit(1)
-    #         else:
-    #             print("Retry starting mission in 2 seconds...")
-    #             time.sleep(2)
+    for retry in range(max_retries):
+        try:
+            agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
+            break
+        except RuntimeError as e:
+            if retry == max_retries - 1:
+                print("Error starting mission:", e)
+                if isinstance(sys.stdout, Logger): sys.stdout.close()
+                exit(1)
+            else:
+                print("Retry starting mission in 2 seconds...")
+                time.sleep(2)
 
-    # print("Waiting for the mission to start", end=' ')
-    # world_state = agent_host.getWorldState()
-    # while not world_state.has_mission_begun:
-    #     print(".", end="")
-    #     sys.stdout.flush() # Force console print
-    #     time.sleep(0.1)
-    #     world_state = agent_host.getWorldState()
-    #     for error in world_state.errors:
-    #         print("\nERROR during mission start:", error.text)
-    # print("\nMission started!")
+    print("Waiting for the mission to start", end=' ')
+    world_state = agent_host.getWorldState()
+    while not world_state.has_mission_begun:
+        print(".", end="")
+        sys.stdout.flush() # Force console print
+        time.sleep(0.1)
+        world_state = agent_host.getWorldState()
+        for error in world_state.errors:
+            print("\nERROR during mission start:", error.text)
+    print("\nMission started!")
 
     # --- RL Setup ---
     q_agent = QLearningAgent(
@@ -239,34 +239,6 @@ if __name__ == "__main__":
     initial_farm_spots = list(VALID_FARM_COORDINATES) 
 
     for episode in range(num_episodes):
-        # Start a new mission for each episode
-        my_mission = MalmoPython.MissionSpec(mission_xml, True)
-        my_mission_record = MalmoPython.MissionRecordSpec()
-        for retry in range(max_retries):
-            try:
-                agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
-                break
-            except RuntimeError as e:
-                if retry == max_retries - 1:
-                    print("Error starting mission:", e)
-                    if isinstance(sys.stdout, Logger): sys.stdout.close()
-                    exit(1)
-                else:
-                    print("Retry starting mission in 2 seconds...")
-                    time.sleep(2)
-
-        print("Waiting for the mission to start", end=' ')
-        world_state = agent_host.getWorldState()
-        while not world_state.has_mission_begun:
-            print(".", end="")
-            sys.stdout.flush()
-            time.sleep(0.1)
-            world_state = agent_host.getWorldState()
-            for error in world_state.errors:
-                print("\nERROR during mission start:", error.text)
-        print("\nMission started!")
-
-
         start_x, start_z = random.choice(initial_farm_spots)
         teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
         time.sleep(0.2) 
@@ -286,10 +258,10 @@ if __name__ == "__main__":
         print("========== S T A R T   O F   E P I S O D E : {:>5} ==========".format(episode + 1))
         print("=" * 70)
         print("Initial position: ({}, {}), Initial wheat in inventory: {}".format(current_x, current_z, initial_wheat_count))
-        print_intuitive_state_5_points(current_state)
+        # print_intuitive_state_5_points(current_state)
         print("-" * 70) 
 
-
+        agent_host.sendCommand("setPitch 90")
         for step_num in range(max_steps_per_episode):
             world_state = agent_host.getWorldState() # Get fresh world state
             if not world_state.is_mission_running:
