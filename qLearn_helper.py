@@ -157,110 +157,110 @@ def look_down_harvest_and_replant(agent_host):
 
 
 
-# VALID_FARM_COORDINATES and ILLEGAL_COORD_MARKER should still be defined globally
-# from qLearn_helper import get_wheat_age_in_los, teleport_agent
-# (Assuming these are in qLearn_helper.py or defined in the same file)
+CONDITION_OUT_OF_BOUNDS = 0        # For spots outside VALID_FARM_COORDINATES
+CONDITION_EMPTY_FARMABLE = 1     # Spot is valid farmland, but no wheat (age -1 from LoS)
+CONDITION_IMMATURE_WHEAT = 2     # Wheat age 0-6
+CONDITION_MATURE_WHEAT = 3       # Wheat age 7
 
-def get_state_active_scan_5_points(agent_host_instance, current_x, current_z):
+def _convert_age_to_condition(raw_age_value, is_valid_farm_coord):
     """
-    Gets the state by actively checking the current cell and its 4 cardinal neighbors.
-    State: (current_x, current_z, age_N, age_E, age_S, age_W, age_current_spot)
-    NO SEED INFORMATION INCLUDED.
+    Helper to convert raw age to our simplified condition,
+    considering if the coordinate itself is valid farmable land.
     """
-    original_pos_y = 227.0 # Agent's standing Y level
+    if not is_valid_farm_coord:
+        return CONDITION_OUT_OF_BOUNDS
+    
+    # If it's valid farm coordinate, now check wheat status
+    if raw_age_value == 7:
+        return CONDITION_MATURE_WHEAT
+    elif raw_age_value >= 0 and raw_age_value < 7: # Covers 0-6
+        return CONDITION_IMMATURE_WHEAT
+    elif raw_age_value == -1: # LoS reported "not wheat" or "no age" on valid farmland
+        return CONDITION_EMPTY_FARMABLE
+    else: # raw_age_value is -2 (LoS error) or other unexpected on valid farmland
+          # Defaulting to empty farmable, or could be a separate error condition
+        print("Warning: Unexpected raw_age_value ({}) on valid farm coord. Treating as Empty/Farmable.".format(raw_age_value))
+        return CONDITION_EMPTY_FARMABLE
+    
 
-    # Define relative offsets for N, E, S, W (relative to current agent position)
-    # Order: North, East, South, West
-    cardinal_offsets = [
-        (0, -1),  # North (Z decreases)
-        (1, 0),   # East  (X increases)
-        (0, 1),   # South (Z increases)
-        (-1, 0)   # West  (X decreases)
-    ]
 
-    neighbor_ages = [] # To store ages of N, E, S, W
 
-    # Make agent look down before starting scans
+def get_state_abstracted_5_points(agent_host_instance, current_x, current_z):
+    """
+    Gets an abstracted state based on the condition of the current cell and its 4 cardinal neighbors.
+    State: (condition_N, condition_E, condition_S, condition_W, condition_current_spot)
+    Conditions: 0 (OOB), 1 (Empty/Farmable), 2 (Immature), 3 (Mature).
+    """
+    original_pos_y = 227.0 
+    cardinal_offsets = [(0, -1), (1, 0), (0, 1), (-1, 0)] # N, E, S, W
+    neighbor_conditions = []
+
     agent_host_instance.sendCommand("setPitch 90") 
-    time.sleep(0.1) # Allow pitch to settle
+    time.sleep(0.1)
 
-    # 1. Get age at the agent's current spot first
-    age_current_spot = get_wheat_age_in_los(agent_host_instance)
-    # Normalize error codes from get_wheat_age_in_los to -1 for simplicity in state
-    age_current_spot = age_current_spot if age_current_spot is not None and age_current_spot >= 0 else -1
-
+    # 1. Get condition at the agent's current spot first
+    # Current spot is assumed to be within VALID_FARM_COORDINATES if agent starts there and moves validly
+    is_current_spot_valid_farm = (current_x, current_z) in VALID_FARM_COORDINATES
+    raw_age_current_spot = get_wheat_age_in_los(agent_host_instance)
+    condition_current_spot = _convert_age_to_condition(raw_age_current_spot, is_current_spot_valid_farm)
 
     # 2. Scan the 4 cardinal neighbors
     for dx, dz in cardinal_offsets:
         neighbor_x = current_x + dx
         neighbor_z = current_z + dz
+        is_neighbor_valid_farm = (neighbor_x, neighbor_z) in VALID_FARM_COORDINATES
 
-        if (neighbor_x, neighbor_z) in VALID_FARM_COORDINATES:
+        if is_neighbor_valid_farm: # Only teleport and check LoS if it's a valid farm coordinate
             teleport_agent(agent_host_instance, neighbor_x + 0.5, original_pos_y, neighbor_z + 0.5)
-            age = get_wheat_age_in_los(agent_host_instance)
-            neighbor_ages.append(age if age is not None and age >= 0 else -1) 
+            raw_age_neighbor = get_wheat_age_in_los(agent_host_instance)
+            neighbor_conditions.append(_convert_age_to_condition(raw_age_neighbor, True)) # True because we checked
         else:
-            neighbor_ages.append(ILLEGAL_COORD_MARKER)
+            # If outside VALID_FARM_COORDINATES, it's directly OOB
+            neighbor_conditions.append(CONDITION_OUT_OF_BOUNDS) 
     
-    # 3. Teleport back to the original position
     teleport_agent(agent_host_instance, current_x + 0.5, original_pos_y, current_z + 0.5)
-    # Agent should still be looking down from the initial setPitch 90.
 
-    # Construct the state tuple in a consistent order:
-    # (current_x, current_z, age_N, age_E, age_S, age_W, age_current_spot)
-    state_list = [current_x, current_z]
-    state_list.extend(neighbor_ages) # Adds the 4 neighbor ages
-    state_list.append(age_current_spot) 
-    
+    state_list = []
+    state_list.extend(neighbor_conditions) 
+    state_list.append(condition_current_spot)
     return tuple(state_list)
 
 
 
 
+# helper.py
+# ... (ILLEGAL_COORD_MARKER defined)
 
-# Assume ILLEGAL_COORD_MARKER is defined globally
+# helper.py
 
-def print_intuitive_state_5_points(state_tuple):
+# ... (CONDITION_ constants defined above) ...
+
+def print_intuitive_abstracted_state(state_tuple):
     """
-    Prints the 5-point state tuple (without seed info) in a more human-readable format.
-    Assumes state_tuple format:
-    (current_x, current_z, age_N, age_E, age_S, age_W, age_current_spot)
+    Prints the abstracted 5-point state tuple in a more human-readable format.
+    (condition_N, condition_E, condition_S, condition_W, condition_current_spot)
     """
-    if not isinstance(state_tuple, tuple) or len(state_tuple) != 7: # Length is now 7
-        print("Invalid state tuple format for intuitive printing (expected 7 elements).")
-        print("Raw state: {}".format(state_tuple))
-        return
+    if not isinstance(state_tuple, tuple) or len(state_tuple) != 5:
+        print("Invalid abstracted state tuple format (expected 5 elements).")
+        print("Raw state: {}".format(state_tuple)); return
 
-    current_x, current_z, age_N, age_E, age_S, age_W, age_current_spot = state_tuple
+    cond_N, cond_E, cond_S, cond_W, cond_curr = state_tuple
     
-    # Helper to format age or illegal marker
-    def format_age(age_value):
-        if age_value == ILLEGAL_COORD_MARKER:
-            return "XXX"  # Indicates out of bounds / illegal
-        elif age_value == -1: # Specifically for "not wheat" or "no age property" as normalized by get_state
-            return "-1"   # Display as "-1"
-        elif age_value < -1: # For other potential negative error codes from get_wheat_age_in_los if they existed
-            return "ERR"  # Or some other error indicator like "???"
-        elif age_value >= 0 and age_value <=7: # Valid wheat age
-            return str(age_value)
-        else: # Should not happen if get_state normalizes properly
-            return "???"
+    def format_condition(cond_value):
+        if cond_value == CONDITION_MATURE_WHEAT: return " M "
+        elif cond_value == CONDITION_IMMATURE_WHEAT: return " I "
+        elif cond_value == CONDITION_EMPTY_FARMABLE: return " E " # Empty/Farmable
+        elif cond_value == CONDITION_OUT_OF_BOUNDS: return "XXX" # Out of Bounds
+        else: return " ? "
 
-
-    print("--- Agent State (5-Point Scan) ---")
-    print("Current Position: ({}, {})".format(current_x, current_z))
-    # "Has Seeds" line removed
-    print("Wheat Ages:")
-    print("        ({})       ".format(format_age(age_N)))                 # North
-    print("         ^         ")
-    print(" ({}) <-- ({}) --> ({}) ".format(
-        format_age(age_W),      # West
-        format_age(age_current_spot), # Current
-        format_age(age_E)       # East
-    ))
-    print("         v         ")
-    print("        ({})       ".format(format_age(age_S)))                 # South
+    print("--- Agent Abstracted Local State ---")
+    print("       ({})      ".format(format_condition(cond_N)))
+    print("        ^        ")
+    print("({}) <-- ({}) --> ({})".format(format_condition(cond_W),format_condition(cond_curr),format_condition(cond_E)))
+    print("        v        ")
+    print("       ({})      ".format(format_condition(cond_S)))
     print("------------------------------------")
+    print("(M=Mature, I=Immature, E=Empty/Farmable, XXX=OutOfBounds)")
 
 
 
@@ -371,68 +371,70 @@ STEP_PENALTY = 0.1 # You can tune this value
 
 # ... (perform_harvest_sequence, perform_plant_sequence functions as before) ...
 
-def step(agent_host_instance, action_index, current_x, current_z, current_state_tuple):
-    """
-    Executes an action, calculates reward (including a step penalty), 
-    and determines next position.
-    """
-    # global agent_host # Not needed if agent_host_instance is passed
-    
-    base_reward_for_action = 0 # Reward specific to the outcome of the chosen action
-    next_x, next_z = current_x, current_z
-    age_at_current_spot = current_state_tuple[6] 
 
-    move_deltas = {
-        ACTION_MOVE_N: (0, -1, current_state_tuple[2]),
-        ACTION_MOVE_E: (1, 0, current_state_tuple[3]),
-        ACTION_MOVE_S: (0, 1, current_state_tuple[4]),
-        ACTION_MOVE_W: (-1, 0, current_state_tuple[5])
+def step(agent_host_instance, action_index, current_x, current_z, current_abstracted_state_tuple):
+    base_reward_for_action = 0
+    next_x, next_z = current_x, current_z # Agent stays put by default
+
+    # Extract conditions from the state tuple (N, E, S, W, Current_Spot)
+    cond_N, cond_E, cond_S, cond_W, condition_at_current_spot = current_abstracted_state_tuple
+
+    move_deltas_and_dest_conditions = {
+        ACTION_MOVE_N: ((0, -1), cond_N),
+        ACTION_MOVE_E: ((1, 0),  cond_E),
+        ACTION_MOVE_S: ((0, 1),  cond_S),
+        ACTION_MOVE_W: ((-1, 0), cond_W)
     }
 
-    if action_index in move_deltas:
-        dx, dz, age_at_dest = move_deltas[action_index]
+    if action_index in move_deltas_and_dest_conditions:
+        (dx, dz), dest_condition = move_deltas_and_dest_conditions[action_index]
         potential_next_x, potential_next_z = current_x + dx, current_z + dz
         
-        if age_at_dest != ILLEGAL_COORD_MARKER:
+        # A destination is valid for MOVEMENT if its condition was not OUT_OF_BOUNDS
+        if dest_condition != CONDITION_OUT_OF_BOUNDS:
             next_x, next_z = potential_next_x, potential_next_z
             teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5)
-            # No specific positive/negative reward for valid movement itself yet
         else:
-            base_reward_for_action = -0.5 # Penalty for trying to move out of bounds (on top of step penalty)
-            # next_x, next_z remain current_x, current_z
-            # print("INFO: Agent tried to move to illegal spot...")
+            base_reward_for_action = -0.5 # Penalty for trying to move out of bounds
+            # print("INFO: Agent tried to move to OOB spot.")
             
     elif action_index == ACTION_HARVEST_CURRENT:
-        if age_at_current_spot == 7:
+        if condition_at_current_spot == CONDITION_MATURE_WHEAT:
             base_reward_for_action = 10.0  
-            print("INFO: Action Harvest - Harvested mature wheat! (age {})".format(age_at_current_spot))
-            perform_harvest_sequence(agent_host_instance)
-        elif age_at_current_spot >= 0 and age_at_current_spot < 7:
+            print("INFO: Action Harvest - Harvested mature wheat!")
+            perform_harvest_sequence(agent_host_instance) # Only attacks
+        elif condition_at_current_spot == CONDITION_IMMATURE_WHEAT:
             base_reward_for_action = -5.0 
-            print("INFO: Action Harvest - Penalized for breaking immature wheat (age {}).".format(age_at_current_spot))
-            perform_harvest_sequence(agent_host_instance)
-        else: 
+            print("INFO: Action Harvest - Penalized for breaking immature wheat.")
+            perform_harvest_sequence(agent_host_instance) # Only attacks
+        else: # CONDITION_EMPTY_FARMABLE or CONDITION_OUT_OF_BOUNDS (if current somehow became OOB)
             base_reward_for_action = -1.0 
-            print("INFO: Action Harvest - Tried to harvest empty spot (age {}).".format(age_at_current_spot))
+            print("INFO: Action Harvest - Tried to harvest non-wheat/empty/OOB spot.")
 
     elif action_index == ACTION_PLANT_CURRENT:
-        if age_at_current_spot == -1: 
-            base_reward_for_action = 5.0 
-            print("INFO: Action Plant - Planted seed on empty spot.")
+        if condition_at_current_spot == CONDITION_EMPTY_FARMABLE: 
+            base_reward_for_action = 5.0 # Reward for planting on a suitable empty spot
+            print("INFO: Action Plant - Planted seed on empty farmable spot.")
             perform_plant_sequence(agent_host_instance)
-        else: 
-            base_reward_for_action = -1.0 
-            print("INFO: Action Plant - Tried to plant on non-empty/unsuitable spot (age {}).".format(age_at_current_spot))
+        else: # Mature, Immature wheat already present, or current spot is OOB
+            base_reward_for_action = -1.0 # Penalty
+            print("INFO: Action Plant - Tried to plant on non-empty or unsuitable spot (Cond: {}).".format(condition_at_current_spot))
 
     elif action_index == ACTION_WAIT:
-        time.sleep(0.5) 
+        time.sleep(0.5) # Adjust sleep based on MsPerTick. This is 0.5 real seconds.
         print("INFO: Action Wait.")
-        # No specific base_reward_for_action for waiting, so it will just incur the STEP_PENALTY
+        if condition_at_current_spot == CONDITION_MATURE_WHEAT:
+             base_reward_for_action = -0.2 # Small penalty for not harvesting mature wheat
+        elif condition_at_current_spot == CONDITION_OUT_OF_BOUNDS:
+             base_reward_for_action = -1.0 # Penalty for waiting on an OOB spot (shouldn't happen if moves are valid)
 
-    # Apply the constant step penalty to the action's base reward
-    final_reward = base_reward_for_action - STEP_PENALTY
 
+    final_reward = base_reward_for_action - STEP_PENALTY 
     return (next_x, next_z), final_reward
+
+
+
+
 
 def get_inventory_item_count(agent_host_instance, item_name_to_find):
     """

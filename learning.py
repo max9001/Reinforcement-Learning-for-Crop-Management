@@ -6,17 +6,7 @@ import sys
 import random
 import time
 import json
-from qLearn_helper import (
-    get_inventory_item_count,
-    get_state_active_scan_5_points,
-    print_intuitive_state_5_points,
-    step,
-    teleport_agent,
-    get_ticks_since_mission_start,
-    VALID_FARM_COORDINATES, # Make sure these are imported or defined here
-    ACTIONS_LIST,
-    ACTION_NAMES
-)
+from qLearn_helper import *
 from q_agent import QLearningAgent
 import matplotlib.pyplot as plt # Ensure matplotlib is imported
 
@@ -187,197 +177,180 @@ if __name__ == "__main__":
     </AgentSection>
 </Mission>
 '''    
+    # --- Agent Setup ---
     agent_host = MalmoPython.AgentHost()
-    # ... (agent_host.parse, client_pool, mission_spec setup) ...
     try:
-        agent_host.parse(sys.argv)
+        agent_host.parse(sys.argv) # sys.argv needs 'import sys'
     except RuntimeError as e:
-        print('ERROR parsing arguments:', e); print(agent_host.getUsage())
-        if isinstance(sys.stdout, Logger): sys.stdout.close(); exit(1)
+        print('ERROR parsing arguments:', e)
+        print(agent_host.getUsage())
+        exit(1)
     if agent_host.receivedArgument("help"):
         print(agent_host.getUsage())
-        if isinstance(sys.stdout, Logger): sys.stdout.close(); exit(0)
+        exit(0)
 
+    # --- Setup ClientPool ---
+    # This is generally more robust for starting missions
     my_client_pool = MalmoPython.ClientPool()
-    my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000))
+    my_client_pool.add(MalmoPython.ClientInfo("127.0.0.1", 10000)) # Default Malmo port
+
     my_mission = MalmoPython.MissionSpec(mission_xml, True)
     my_mission_record = MalmoPython.MissionRecordSpec()
 
+    max_retries = 3
+    for retry in range(max_retries):
+        try:
+            # Attempt to start the mission using the client pool:
+            # The last parameter (0) is the experiment_id, unique for each agent if running multiple.
+            # The last string ("Frank_experiment") is a unique role ID for this agent in this experiment.
+            agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_Wheat_Collector_Role")
+            break
+        except RuntimeError as e:
+            if retry == max_retries - 1:
+                print("Error starting mission:", e)
+                print("*********")
+                print("Most likely incorrect formatting in your XML section -Max")
+                print("*********")
+                exit(1)
+            else:
+                print("Retry starting mission in 2 seconds...")
+                time.sleep(2)
+
+    print("Waiting for the mission to start", end=' ')
+    world_state = agent_host.getWorldState()
+    while not world_state.has_mission_begun:
+        print(".", end="")
+        time.sleep(0.1)
+        world_state = agent_host.getWorldState()
+        for error in world_state.errors: # Check for errors reported by Malmo
+            print("\nERROR during mission start:", error.text)
+            # If there are errors here, it often means an XML issue or client connection problem
+    print("\nMission started!")
+
     # --- RL Setup ---
-    training_state_filename = "farm_training_state.pkl" # Define filename
+    training_state_filename = "farm_abstract_q_table.pkl" # New filename for new state representation
+    # IMPORTANT: When changing state representation, you MUST start with a new Q-table
+    # or ensure your loading logic can handle the change (which it currently can't easily).
+    # Best to use a new filename.
 
     q_agent = QLearningAgent(
         actions_list=list(range(len(ACTIONS_LIST))), 
         alpha=0.1, gamma=0.9, epsilon=1.0, 
-        epsilon_decay=0.98, min_epsilon=0.05   
+        epsilon_decay=0.99, # Adjusted from your 0.98, 0.996 was a previous suggestion
+        min_epsilon=0.05   
     )
 
     # Load existing training state (Q-table, epsilon, histories)
+    # This will create a new table if farm_abstract_q_table.pkl doesn't exist
     start_episode_num, episode_rewards, episode_wheat_collected = q_agent.load_training_state(training_state_filename)
-    # episode_rewards and episode_wheat_collected will be populated with historical data if loaded
 
-    # --- Malmo Mission Start ---
-    # ... (your mission start loop as before) ...
-    max_retries = 3
-    for retry in range(max_retries):
-        try:
-            agent_host.startMission(my_mission, my_client_pool, my_mission_record, 0, "Frank_RL_Farmer_Role")
-            break
-        except RuntimeError as e:
-            if retry == max_retries - 1: print("Error starting mission:", e); exit(1)
-            else: print("Retry starting mission..."); time.sleep(2)
-    print("Waiting for the mission to start", end=' '); world_state = agent_host.getWorldState()
-    while not world_state.has_mission_begun: print(".", end=""); sys.stdout.flush(); time.sleep(0.1); world_state = agent_host.getWorldState()
-    for error in world_state.errors: print("\nERROR:", error.text)
+    # ... (mission start logic) ...
     print("\nMission started!")
 
-
     # --- RL Training Loop ---
-    # num_episodes_this_session is how many MORE episodes to run in THIS session
-    num_episodes_this_session = 150  
+    num_episodes_this_session = 100 # Increased for potentially faster learning with smaller state space 
     total_episodes_target = start_episode_num + num_episodes_this_session 
-    max_steps_per_episode = 100 
+    max_steps_per_episode = 200 # Might need more steps to see effects of waiting
 
-    if not 'VALID_FARM_COORDINATES' in globals() and not 'VALID_FARM_COORDINATES' in locals():
-         print("ERROR: VALID_FARM_COORDINATES not defined/imported!")
-         if isinstance(sys.stdout, Logger): sys.stdout.close(); exit(1)
-    initial_farm_spots = list(VALID_FARM_COORDINATES) 
-
-    start_time = 0
+    # ... (initial_farm_spots setup) ...
 
     try: 
-        # Loop from the loaded start_episode_num up to the new target
         for episode_idx in range(start_episode_num, total_episodes_target):
-            # episode_idx is 0-indexed internally for loop, actual episode number is episode_idx + 1
             actual_episode_number = episode_idx + 1
-
-            start_x, start_z = random.choice(initial_farm_spots)
+            # ... (episode start: teleport, get initial_wheat_count) ...
+            start_x, start_z = 0, -2
             teleport_agent(agent_host, start_x + 0.5, 227.0, start_z + 0.5)
-            time.sleep(0.2) 
-
+            time.sleep(0.2)
             current_x, current_z = start_x, start_z
             current_cumulative_reward = 0
-            
-            time.sleep(0.1) 
+            time.sleep(0.1)
             initial_wheat_count = get_inventory_item_count(agent_host, "wheat")
-            if initial_wheat_count < 0: 
-                print("WARNING: Error getting initial wheat count for episode {}. Setting to 0.".format(actual_episode_number))
+            if initial_wheat_count < 0:
                 initial_wheat_count = 0
             
-            current_state = get_state_active_scan_5_points(agent_host, current_x, current_z)
+            # Use the new state function
+            current_state = get_state_abstracted_5_points(agent_host, current_x, current_z) 
 
             print("\n" + "=" * 70)
             print("========== S T A R T   O F   E P I S O D E : {:>5} ==========".format(actual_episode_number))
             print("=" * 70)
-            print("Initial position: ({}, {}), Initial wheat in inventory: {}".format(current_x, current_z, initial_wheat_count))
+            print("Physical Position: ({}, {})".format(current_x, current_z)) # Keep track of physical pos for debug
+            print("Initial wheat in inventory: {}".format(initial_wheat_count))
             print("Current Epsilon (start of ep): {:.4f}".format(q_agent.epsilon))
-            print_intuitive_state_5_points(current_state)
-            
-            # time.sleep(0.5)  
-            # # print("-" * 70) 
-            # ticks = get_ticks_since_mission_start(agent_host)
-            # ticks = ticks - start_time
-            # print()
-            # print("episode length: ")
-            # print(ticks)
-            # print()
-            # time.sleep(0.5) 
-            # start_time = get_ticks_since_mission_start(agent_host)
-            # print("start time:")
-            # print(start_time)
-            # print()
-            # time.sleep(0.5) 
+            print_intuitive_abstracted_state(current_state) # Use new print function
+            print("-" * 70) 
 
             for step_num in range(max_steps_per_episode):
-                # ... (step execution logic as before) ...
+                # ... (world_state checks) ...
                 world_state = agent_host.getWorldState() 
-                if not world_state.is_mission_running:
-                    print("Mission ended prematurely in episode {} at step {}.".format(actual_episode_number, step_num + 1))
-                    break
+                if not world_state.is_mission_running: break
                 for error in world_state.errors: print("MALMO RUNTIME ERROR: {}".format(error.text))
 
-                action_idx = q_agent.choose_action(current_state)
+                action_idx = q_agent.choose_action(current_state) # current_state is now the abstracted one
+                
+                # step function now takes the abstracted state
                 (next_x, next_z), reward = step(agent_host, action_idx, current_x, current_z, current_state)
                 current_cumulative_reward += reward
+                
                 time.sleep(0.1) 
-                next_state = get_state_active_scan_5_points(agent_host, next_x, next_z)
+                # Get new abstracted state based on the new physical position (next_x, next_z)
+                next_state = get_state_abstracted_5_points(agent_host, next_x, next_z)
+                
                 q_agent.learn(current_state, action_idx, reward, next_state)
+
                 current_state = next_state
-                current_x, current_z = next_x, next_z
-                print("Ep {}, St {}: @({}, {}), Act:{}, Rew:{:.1f}, TotRew:{:.1f}, Eps:{:.3f}".format(
+                current_x, current_z = next_x, next_z # Update physical position
+
+                print("Ep {}, St {}: PhysPos@({}, {}), Act:{}, Rew:{:.1f}, TotRew:{:.1f}, Eps:{:.3f}".format(
                     actual_episode_number, step_num + 1, current_x, current_z, ACTION_NAMES.get(action_idx, "Unknown"), 
-                    reward, current_cumulative_reward, q_agent.epsilon))
-                time.sleep(0.05)  
+                    reward, current_cumulative_reward, q_agent.epsilon
+                ))
+                # if (step_num + 1) % 20 == 0: # Print state less often
+                #    print_intuitive_abstracted_state(current_state)
+                time.sleep(0.05)
 
             # --- End of Episode ---
-            # Append to the potentially loaded lists
+            # ... (append rewards, decay epsilon, get final wheat, save training state) ...
+            # (This part remains largely the same, just ensure filenames and variables are consistent)
             episode_rewards.append(current_cumulative_reward) 
             q_agent.decay_epsilon()
-
             final_wheat_count = get_inventory_item_count(agent_host, "wheat")
-            if final_wheat_count < 0: 
-                print("WARNING: Error getting final wheat count for episode {}. Assuming no change.".format(actual_episode_number))
-                final_wheat_count = initial_wheat_count 
+            if final_wheat_count < 0: final_wheat_count = initial_wheat_count 
             wheat_collected_this_episode = final_wheat_count - initial_wheat_count
             episode_wheat_collected.append(wheat_collected_this_episode)
 
-            # ... (obnoxious end of episode print statements, using actual_episode_number) ...
-            print("-" * 70)
-            print("*" * 70)
+            print("-" * 70); print("*" * 70)
             print("********** E N D   O F   E P I S O D E : {:>5} **********".format(actual_episode_number))
+            # ... (print summary)
             print("Total Reward for Episode: {:.2f}".format(current_cumulative_reward))
             print("Wheat Collected This Episode: {}".format(wheat_collected_this_episode))
             print("Total Wheat in Inventory: {}".format(final_wheat_count))
             print("Current Epsilon (end of ep): {:.4f}".format(q_agent.epsilon))
-            print("*" * 70)
-            sys.stdout.flush()
-
-            # Save training state at the end of every episode
-            # Pass episode_idx (0-indexed) as last_episode_completed
+            print("*" * 70); sys.stdout.flush()
             q_agent.save_training_state(training_state_filename, episode_idx, episode_rewards, episode_wheat_collected)
 
     except KeyboardInterrupt:
         print("\nINFO: Training interrupted. Saving final state...")
     finally: 
-        if 'q_agent' in locals() and 'episode_idx' in locals(): 
-             q_agent.save_training_state(training_state_filename, episode_idx, episode_rewards, episode_wheat_collected)
-        elif 'q_agent' in locals(): # If interrupted before first episode completed
-             q_agent.save_training_state(training_state_filename, -1, episode_rewards, episode_wheat_collected)
-
-
+        # ... (saving logic as before, using training_state_filename) ...
+        if 'q_agent' in locals():
+            last_ep_completed = episode_idx if 'episode_idx' in locals() else start_episode_num -1
+            q_agent.save_training_state(training_state_filename, last_ep_completed, episode_rewards, episode_wheat_collected)
+        # ... (plotting logic as before, using training_state_filename) ...
+        # ... (quit mission, close logger) ...
         print("\n" + "#" * 70)
         print("############ T R A I N I N G   S E S S I O N   E N D E D ############")
         print("#" * 70)
-
         if episode_rewards: 
             try:
-                plt.figure(figsize=(14, 6))
-                plt.subplot(1, 2, 1)
-                plt.plot(episode_rewards) # This will now plot the full history
-                plt.title('Cumulative Episode Rewards Over All Time')
-                plt.xlabel('Overall Episode Number (across sessions)')
-                plt.ylabel('Total Reward')
-                plt.grid(True)
-
-                plt.subplot(1, 2, 2)
-                plt.plot(episode_wheat_collected) # Full history
-                plt.title('Cumulative Wheat Collected Per Episode')
-                plt.xlabel('Overall Episode Number (across sessions)')
-                plt.ylabel('Net Wheat Collected')
-                plt.grid(True)
-                
-                plt.tight_layout()
-                plot_filename = "training_plots_cumulative.png" 
-                plt.savefig(plot_filename)
-                print("INFO: Cumulative plots saved to {}".format(plot_filename))
+                plt.figure(figsize=(14, 6)); plt.subplot(1, 2, 1); plt.plot(episode_rewards) 
+                plt.title('Cumulative Episode Rewards'); plt.xlabel('Overall Episode Number'); plt.ylabel('Total Reward'); plt.grid(True)
+                plt.subplot(1, 2, 2); plt.plot(episode_wheat_collected)
+                plt.title('Cumulative Wheat Collected Per Episode'); plt.xlabel('Overall Episode Number'); plt.ylabel('Net Wheat Collected'); plt.grid(True)
+                plt.tight_layout(); plot_filename = "training_plots_abstract_cumulative.png" 
+                plt.savefig(plot_filename); print("INFO: Cumulative plots saved to {}".format(plot_filename))
             except ImportError: print("WARNING: matplotlib not found.")
             except Exception as e: print("ERROR: Could not generate plots - {}".format(e))
-
-        if agent_host.getWorldState().is_mission_running:
-            print("INFO: Mission still running, sending quit command.")
-            agent_host.sendCommand("quit"); time.sleep(1)
+        if agent_host.getWorldState().is_mission_running: agent_host.sendCommand("quit"); time.sleep(1)
         print("--- Script End ---")
-        if isinstance(sys.stdout, Logger):
-            print("INFO: Closing log file: {}".format(sys.stdout.filename))
-
-            sys.stdout.close()
+        if isinstance(sys.stdout, Logger): print("INFO: Closing log file: {}".format(sys.stdout.filename)); sys.stdout.close()
