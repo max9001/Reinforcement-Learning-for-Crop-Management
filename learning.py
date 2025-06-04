@@ -9,6 +9,7 @@ import json
 from qLearn_helper import *
 from q_agent import QLearningAgent
 
+
 # --- Class to Tee stdout to a file (as provided before) ---
 # --- Class to Tee stdout to a file ---
 class Logger(object):
@@ -71,7 +72,7 @@ if __name__ == "__main__":
         <Summary>Frank's Test - Step 2</Summary>
     </About>
     <ModSettings>
-        <MsPerTick>1</MsPerTick>
+        <MsPerTick>3</MsPerTick>
     </ModSettings>
     <ServerSection>
         <ServerInitialConditions>

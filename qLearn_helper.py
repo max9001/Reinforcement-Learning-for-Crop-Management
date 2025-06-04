@@ -14,16 +14,32 @@ VALID_FARM_COORDINATES = set([
     (3, -6),  (3, -5),  (3, -4),  (3, -3),  (3, -2),  (3, -1),  (3, 0),
 ])
 # ACTIONS for the Q-Learning Agent
-ACTION_MOVE = 0
-ACTION_HARVEST = 1
-ACTION_PLANT = 2
+ACTION_MOVE_N = 0
+ACTION_MOVE_E = 1
+ACTION_MOVE_S = 2
+ACTION_MOVE_W = 3
+ACTION_HARVEST_CURRENT = 4 # Just attempt to harvest (attack) current spot
+ACTION_PLANT_CURRENT = 5   # Attempt to plant on current spot (if empty)
+ACTION_WAIT = 6            # Do nothing for a short period
 
-ACTIONS_LIST = [ACTION_MOVE, ACTION_HARVEST, ACTION_PLANT]
+ACTIONS_LIST = [
+    ACTION_MOVE_N,
+    ACTION_MOVE_E,
+    ACTION_MOVE_S,
+    ACTION_MOVE_W,
+    ACTION_HARVEST_CURRENT, # Changed from HARVEST_PLANT_CURRENT
+    ACTION_PLANT_CURRENT,
+    ACTION_WAIT
+]
 
-ACTION_NAMES = {
-    ACTION_MOVE: "Move",
-    ACTION_HARVEST: "Harvest",
-    ACTION_PLANT: "Plant"
+ACTION_NAMES = { # For printing/logging
+    ACTION_MOVE_N: "Move_N",
+    ACTION_MOVE_E: "Move_E",
+    ACTION_MOVE_S: "Move_S",
+    ACTION_MOVE_W: "Move_W",
+    ACTION_HARVEST_CURRENT: "Harvest", # Changed name
+    ACTION_PLANT_CURRENT: "Plant",
+    ACTION_WAIT: "Wait"
 }
 
 
