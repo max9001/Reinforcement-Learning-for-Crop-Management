@@ -20,7 +20,7 @@ ACTION_MOVE_S = 2
 ACTION_MOVE_W = 3
 ACTION_HARVEST_CURRENT = 4 # Just attempt to harvest (attack) current spot
 ACTION_PLANT_CURRENT = 5   # Attempt to plant on current spot (if empty)
-ACTION_WAIT = 6            # Do nothing for a short period
+ACTION_EXPLORE = 6            # Do nothing for a short period
 
 ACTIONS_LIST = [
     ACTION_MOVE_N,
@@ -29,7 +29,7 @@ ACTIONS_LIST = [
     ACTION_MOVE_W,
     ACTION_HARVEST_CURRENT, # Changed from HARVEST_PLANT_CURRENT
     ACTION_PLANT_CURRENT,
-    ACTION_WAIT
+    ACTION_EXPLORE
 ]
 
 ACTION_NAMES = { # For printing/logging
@@ -39,7 +39,7 @@ ACTION_NAMES = { # For printing/logging
     ACTION_MOVE_W: "Move_W",
     ACTION_HARVEST_CURRENT: "Harvest", # Changed name
     ACTION_PLANT_CURRENT: "Plant",
-    ACTION_WAIT: "Wait"
+    ACTION_EXPLORE: "Explore"
 }
 
 
@@ -185,6 +185,30 @@ def _convert_age_to_condition(raw_age_value, is_valid_farm_coord):
 
 
 
+def look_towards_offset(agent_host, dx, dz):
+    """
+    Face to nearby farm-block
+    """
+    if dx == 0 and dz == -1:
+        yaw = 0  # North
+#         print("facing north")
+    elif dx == 1 and dz == 0:
+        yaw = 90  # East
+#         print("facing east")
+    elif dx == 0 and dz == 1:
+        yaw = 180  # South
+#         print("facing south")
+    elif dx == -1 and dz == 0:
+        yaw = 270  # West
+#         print("facing west")
+    else:
+        raise ValueError()
+
+    agent_host.sendCommand("setPitch 45")
+    agent_host.sendCommand("setYaw {}".format(yaw))
+    time.sleep(0.05)
+
+
 def get_state_abstracted_5_points(agent_host_instance, current_x, current_z):
     """
     Gets an abstracted state based on the condition of the current cell and its 4 cardinal neighbors.
@@ -210,19 +234,35 @@ def get_state_abstracted_5_points(agent_host_instance, current_x, current_z):
         neighbor_z = current_z + dz
         is_neighbor_valid_farm = (neighbor_x, neighbor_z) in VALID_FARM_COORDINATES
 
-        if is_neighbor_valid_farm: # Only teleport and check LoS if it's a valid farm coordinate
-            teleport_agent(agent_host_instance, neighbor_x + 0.5, original_pos_y, neighbor_z + 0.5)
-            raw_age_neighbor = get_wheat_age_in_los(agent_host_instance)
-            neighbor_conditions.append(_convert_age_to_condition(raw_age_neighbor, True)) # True because we checked
+#         Old method (teleporting and check Los)
+#         if is_neighbor_valid_farm: # Only teleport and check LoS if it's a valid farm coordinate
+#             teleport_agent(agent_host_instance, neighbor_x + 0.5, original_pos_y, neighbor_z + 0.5)
+#             raw_age_neighbor = get_wheat_age_in_los(agent_host_instance)
+#             neighbor_conditions.append(_convert_age_to_condition(raw_age_neighbor, True)) # True because we checked
+#         else:
+#             # If outside VALID_FARM_COORDINATES, it's directly OOB
+#             neighbor_conditions.append(CONDITION_OUT_OF_BOUNDS)
+        
+        if is_neighbor_valid_farm: #if it's a valid farm coordinate
+            try:
+                look_towards_offset(agent_host_instance, dx, dz)
+                raw_age_neighbor = get_wheat_age_in_los(agent_host_instance)
+#                 print(raw_age_neighbor)
+                neighbor_conditions.append(_convert_age_to_condition(raw_age_neighbor, True)) # True because we checked
+            except ValueError:
+                neighbor_conditions.append(CONDITION_OUT_OF_BOUNDS)
         else:
             # If outside VALID_FARM_COORDINATES, it's directly OOB
-            neighbor_conditions.append(CONDITION_OUT_OF_BOUNDS) 
+            neighbor_conditions.append(CONDITION_OUT_OF_BOUNDS)
     
-    teleport_agent(agent_host_instance, current_x + 0.5, original_pos_y, current_z + 0.5)
+    # teleport_agent(agent_host_instance, current_x + 0.5, original_pos_y, current_z + 0.5)
 
     state_list = []
     state_list.extend(neighbor_conditions) 
     state_list.append(condition_current_spot)
+    
+    agent_host_instance.sendCommand("setPitch 90") # Ensure to change view back to orignal view
+    time.sleep(0.05)
     return tuple(state_list)
 
 
@@ -420,13 +460,24 @@ def step(agent_host_instance, action_index, current_x, current_z, current_abstra
             base_reward_for_action = -1.0 # Penalty
             print("INFO: Action Plant - Tried to plant on non-empty or unsuitable spot (Cond: {}).".format(condition_at_current_spot))
 
-    elif action_index == ACTION_WAIT:
-        time.sleep(0.5) # Adjust sleep based on MsPerTick. This is 0.5 real seconds.
-        print("INFO: Action Wait.")
-        if condition_at_current_spot == CONDITION_MATURE_WHEAT:
-             base_reward_for_action = -0.2 # Small penalty for not harvesting mature wheat
-        elif condition_at_current_spot == CONDITION_OUT_OF_BOUNDS:
-             base_reward_for_action = -1.0 # Penalty for waiting on an OOB spot (shouldn't happen if moves are valid)
+    elif action_index == ACTION_EXPLORE:
+#         time.sleep(0.5) # Adjust sleep based on MsPerTick. This is 0.5 real seconds.
+#         print("INFO: Action Wait.")
+#         if condition_at_current_spot == CONDITION_MATURE_WHEAT:
+#              base_reward_for_action = -0.2 # Small penalty for not harvesting mature wheat
+#         elif condition_at_current_spot == CONDITION_OUT_OF_BOUNDS:
+#              base_reward_for_action = -1.0 # Penalty for waiting on an OOB spot (shouldn't happen if moves are valid)
+        valid_dirs = [act for act, (_, cond) in move_deltas_and_dest_conditions.items() if cond != CONDITION_OUT_OF_BOUNDS]
+        if valid_dirs:
+            chosen_move_action = random.choice(valid_dirs)
+            (dx, dz), _ = move_deltas_and_dest_conditions[chosen_move_action]
+            next_x, next_z = current_x + dx, current_z + dz
+            teleport_agent(agent_host_instance, next_x + 0.5, 227.0, next_z + 0.5)
+            print("INFO: Action Explore - Random moved from ({}, {}) to ({}, {})".format(current_x, current_z, next_x, next_z))
+        else:
+            print("INFO: Action Explore - No valid directions to move, staying in place.")
+
+        base_reward_for_action = -0.2  # Small penalty to discourage overuse of explore
 
 
     final_reward = base_reward_for_action - STEP_PENALTY 
